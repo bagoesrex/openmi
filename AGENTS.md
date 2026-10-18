@@ -43,15 +43,20 @@ openmi/
 ```
 
 ### Technology Standards
-- **Runtime**: [Bun](https://bun.sh) (v1.x+) — always use `bun` instead of Node/npm/pnpm/yarn.
+- **Runtime**: Pure [Bun](https://bun.sh) ecosystem (v1.x+) — 100% Bun native. Zero Node.js runtime dependencies:
+  - Database: `bun:sqlite`
+  - Testing: `bun:test`
+  - Package manager & Scripts: `bun install`, `bun run`, `bun test`, `bun build`
+  - HTTP Server & Client: Native Bun `fetch` with proxy support, native WebSockets / SSE
 - **Backend (VPS)**:
-  - Framework: [ElysiaJS](https://elysiajs.com)
-  - Database: Native `bun:sqlite` (zero external DB services)
+  - Framework: [ElysiaJS](https://elysiajs.com) (native Bun web framework)
+  - Database: Native `bun:sqlite` with prepared statements
   - Authentication: `@elysiajs/jwt` with `MASTER_PASSWORD` stored in `.env`
   - Real-time: Server-Sent Events (SSE) for log streaming to the dashboard
   - Proxy Support: Optional HTTP/SOCKS5 proxy per account for outbound requests
+  - **Diagnostic Error Logging**: Every error MUST be logged with structured metadata (timestamp ms, account ID, action, HTTP status, Xiaomi error code, raw response body, stack trace, and human-readable diagnostic explanation suitable for AI troubleshooting).
 - **Frontend (Vercel)**:
-  - Framework: React 19 + Vite (bootstrapped with Bun)
+  - Framework: React 19 + Vite (built with Bun)
   - Styling: Tailwind CSS
   - Communication: Fetch API with Bearer JWT + EventSource (SSE)
 - **Deployment Targets**:
