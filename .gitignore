@@ -1,1 +1,9 @@
 *.apk
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+node_modules/
+dist/
+.env
+.superpowers/
