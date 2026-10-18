@@ -11,6 +11,30 @@ let cachedOffsetMs: number = 0;
 let lastSyncTimestamp: number = 0;
 
 export async function syncNtpOffset(): Promise<number> {
+  // First attempt: Cloudflare edge trace endpoint with sub-second precision
+  try {
+    const t0 = Date.now();
+    const res = await fetch("https://cloudflare.com/cdn-cgi/trace", {
+      method: "GET",
+      signal: AbortSignal.timeout(3000),
+    });
+    const t3 = Date.now();
+    const text = await res.text();
+    const tsMatch = text.match(/ts=([\d.]+)/);
+
+    if (tsMatch) {
+      const serverSeconds = parseFloat(tsMatch[1]);
+      const serverTimeMs = Math.round(serverSeconds * 1000);
+      const rtt = t3 - t0;
+      const estimatedTrueTime = serverTimeMs + Math.round(rtt / 2);
+      cachedOffsetMs = estimatedTrueTime - t3;
+      lastSyncTimestamp = Date.now();
+      console.log(`[NTP] Time synchronized via Cloudflare trace: offset = ${cachedOffsetMs}ms (RTT = ${rtt}ms)`);
+      return cachedOffsetMs;
+    }
+  } catch {}
+
+  // Fallback: HTTP Date header with RTT compensation
   const referenceUrls = [
     "https://time.google.com",
     "https://time.cloudflare.com",
@@ -34,8 +58,7 @@ export async function syncNtpOffset(): Promise<number> {
         console.log(`[NTP] Time synchronized via ${url}: offset = ${cachedOffsetMs}ms (RTT = ${rtt}ms)`);
         return cachedOffsetMs;
       }
-    } catch (err: any) {
-      // Try next reference
+    } catch {
       continue;
     }
   }

@@ -40,8 +40,8 @@ export function handleApplyResult(response: XiaomiApiResponse): StateMachineEval
     };
   }
 
-  const applyResult = response.data?.applyResult;
-  const deadline = response.data?.deadlineFormat;
+  const applyResult = response.data?.apply_result ?? response.data?.applyResult;
+  const deadline = response.data?.deadline_format ?? response.data?.deadlineFormat;
 
   switch (applyResult) {
     case 1:

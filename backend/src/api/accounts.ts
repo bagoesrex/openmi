@@ -103,8 +103,8 @@ export function createAccountsApi(db: Database) {
             try {
               const res = await checkUserState(acc);
               const isValid = res.code === 0;
-              const buttonState = res.data?.buttonState;
-              const isPass = res.data?.isPass;
+              const buttonState = res.data?.button_state ?? res.data?.buttonState;
+              const isPass = res.data?.is_pass ?? res.data?.isPass;
 
               accountRepo.update(acc.id, {
                 sessionValid: isValid ? 1 : 0,

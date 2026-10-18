@@ -17,10 +17,15 @@ describe("Xiaomi API Client & State Machine", () => {
   });
 
   it("should correctly classify and produce diagnostic explanations for all 7 applyResult codes", () => {
-    // 1. Success
+    // 1. Success (test camelCase)
     const res1 = handleApplyResult({ code: 0, data: { applyResult: 1 } });
     expect(res1.action).toBe(XiaomiStateAction.SUCCESS);
     expect(res1.isTerminal).toBe(true);
+
+    // 1b. Success (test snake_case from Xiaomi wire format)
+    const res1b = handleApplyResult({ code: 0, data: { apply_result: 1 } });
+    expect(res1b.action).toBe(XiaomiStateAction.SUCCESS);
+    expect(res1b.applyResult).toBe(1);
 
     // 2. Monthly limit / Device cooldown
     const res2 = handleApplyResult({ code: 0, data: { applyResult: 2 } });
