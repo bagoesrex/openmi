@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import type { ExecutionLog } from "../types";
-import { fetchRecentLogs, getSSEUrl } from "../lib/api";
+import { fetchRecentLogs, getSSEUrl, clearAllLogs } from "../lib/api";
 
 export function useSSE(token: string | null) {
   const [logs, setLogs] = useState<ExecutionLog[]>([]);
@@ -56,8 +56,14 @@ export function useSSE(token: string | null) {
     };
   }, [token]);
 
-  const clearLogs = () => {
-    setLogs([]);
+  const clearLogs = async () => {
+    try {
+      await clearAllLogs();
+    } catch (err) {
+      console.error("Failed to clear logs on server:", err);
+    } finally {
+      setLogs([]);
+    }
   };
 
   return {

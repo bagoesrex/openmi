@@ -89,5 +89,25 @@ describe("Elysia REST API", () => {
       })
     );
     expect(logsRes.status).toBe(200);
+
+    // Test permanent log clearing: DELETE /api/logs
+    const clearRes = await app.handle(
+      new Request("http://localhost/api/logs", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${json.token}` },
+      })
+    );
+    expect(clearRes.status).toBe(200);
+    const clearJson = await clearRes.json();
+    expect(clearJson.success).toBe(true);
+
+    // Verify logs are now empty
+    const logsAfterClear = await app.handle(
+      new Request("http://localhost/api/logs", {
+        headers: { Authorization: `Bearer ${json.token}` },
+      })
+    );
+    const emptyLogs = await logsAfterClear.json();
+    expect(emptyLogs.length).toBe(0);
   });
 });

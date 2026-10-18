@@ -16,6 +16,7 @@ export interface LogRepository {
   getRecent(limit?: number): ExecutionLog[];
   getByAccount(accountId: string, limit?: number): ExecutionLog[];
   clearOlderThan(timestamp: number): void;
+  clearAll(): void;
 }
 
 function mapRowToAccount(row: any): Account {
@@ -126,6 +127,7 @@ export function createLogRepo(db: Database): LogRepository {
   const selectRecentStmt = db.prepare("SELECT * FROM execution_logs ORDER BY timestamp DESC LIMIT ?");
   const selectByAccountStmt = db.prepare("SELECT * FROM execution_logs WHERE account_id = ? ORDER BY timestamp DESC LIMIT ?");
   const deleteOlderStmt = db.prepare("DELETE FROM execution_logs WHERE timestamp < ?");
+  const deleteAllStmt = db.prepare("DELETE FROM execution_logs");
 
   return {
     insert(log: NewLog): void {
@@ -147,6 +149,9 @@ export function createLogRepo(db: Database): LogRepository {
     },
     clearOlderThan(timestamp: number): void {
       deleteOlderStmt.run(timestamp);
+    },
+    clearAll(): void {
+      deleteAllStmt.run();
     },
   };
 }

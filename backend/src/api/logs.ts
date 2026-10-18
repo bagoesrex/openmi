@@ -21,6 +21,10 @@ export function createLogsApi(db: Database) {
             const limit = query.limit ? parseInt(query.limit as string, 10) : 100;
             return logRepo.getRecent(limit);
           })
+          .delete("/api/logs", () => {
+            logRepo.clearAll();
+            return { success: true };
+          })
           .get("/api/logs/stream", () => {
             let unsubscribe: (() => void) | null = null;
             let pingInterval: any = null;

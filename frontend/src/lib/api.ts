@@ -95,6 +95,15 @@ export async function fetchRecentLogs(limit: number = 50): Promise<ExecutionLog[
   return res.json();
 }
 
+export async function clearAllLogs(): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/logs`, {
+    method: "DELETE",
+    headers: getHeaders(),
+  });
+
+  if (!res.ok) throw new Error("Failed to clear logs on server");
+}
+
 export function getSSEUrl(token?: string | null): string {
   const activeToken = token || localStorage.getItem("openmi_token");
   return `${API_BASE}/api/logs/stream?token=${encodeURIComponent(activeToken || "")}`;
