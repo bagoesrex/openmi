@@ -8,7 +8,7 @@ Platform ini dibangun sepenuhnya di atas ekosistem **Bun** dengan Clean Architec
 
 ---
 
-## 🚀 Fitur Utama
+## Fitur Utama
 
 1. **Multi-Account Management**: Kelola banyak akun Xiaomi sekaligus (Label, Region `global`/`id`, `cUserId`, `serviceToken`, dan opsi outbound Proxy).
 2. **High-Precision Scheduler**: Berjalan 24/7 di VPS, tersinkronisasi dengan NTP, melakukan TLS pre-warming pada T-10 detik, verifikasi sesi pada T-5 detik, dan eksekusi request concurrent tepat pada **23:00:00 WIB** (**00:00:00 GMT+8 Beijing Time**).
@@ -19,7 +19,18 @@ Platform ini dibangun sepenuhnya di atas ekosistem **Bun** dengan Clean Architec
 
 ---
 
-## 📁 Struktur Monorepo
+## Autentikasi dan Ekstraksi Cookie
+
+OpenMi menggunakan session cookie (`cUserId` dan `serviceToken`) dari akun Xiaomi yang sudah login resmi. Hal ini dilakukan untuk menghindari sistem anti-fraud captcha (Geetest) dan OTP SMS yang diterapkan Xiaomi pada endpoint login langsung.
+
+Panduan langkah demi langkah cara mengambil cookie dari browser PC atau aplikasi HP tersedia di dokumen terpisah:
+- **[Panduan Ekstraksi Kredensial Xiaomi](docs/auth-guide.md)**
+
+Kredensial cukup diinput satu kali saat pendaftaran akun di dashboard dan akan tersimpan di database lokal VPS hingga sesi kedaluwarsa.
+
+---
+
+## Struktur Monorepo
 
 ```
 openmi/
@@ -47,15 +58,15 @@ openmi/
 │   ├── vite.config.ts
 │   └── package.json
 ├── docs/                          # Spesifikasi & dokumentasi lengkap
-│   ├── api-spec.md
-│   ├── auth-guide.md
-│   └── superpowers/
+│   ├── api-spec.md                # Spesifikasi endpoint & payload Xiaomi
+│   ├── auth-guide.md              # Panduan ekstraksi cookie cUserId & serviceToken
+│   └── superpowers/               # Rancangan arsitektur & SDD plan
 └── vercel.json                    # Konfigurasi deployment Vercel
 ```
 
 ---
 
-## 🛠️ Panduan Menjalankan Lokal
+## Panduan Menjalankan Lokal
 
 ### Prasyarat
 - [Bun](https://bun.sh) v1.4+ terinstall di sistem.
@@ -67,7 +78,7 @@ bun install
 
 # Buat file konfigurasi .env
 cp .env.example .env
-# Ubah MASTER_PASSWORD di file .env
+# Sesuaikan MASTER_PASSWORD dan JWT_SECRET di .env
 
 # Jalankan server development
 bun run dev
@@ -86,7 +97,7 @@ Buka `http://localhost:3000` di browser Anda. Masukkan `MASTER_PASSWORD` yang te
 
 ---
 
-## 🌐 Panduan Deployment Produksi
+## Panduan Deployment Produksi
 
 ### A. Deploy Backend ke VPS (Ubuntu/Debian)
 1. Install Bun di VPS:
@@ -112,15 +123,15 @@ Buka `http://localhost:3000` di browser Anda. Masukkan `MASTER_PASSWORD` yang te
    ```
 
 ### B. Deploy Frontend ke Vercel
-1. Import repository ini ke akun Vercel Anda.
+1. Hubungkan repository ini ke akun Vercel Anda.
 2. File `vercel.json` di root akan otomatis mengarahkan build ke direktori `frontend/`.
 3. Tambahkan Environment Variable di Vercel Dashboard:
-   - `VITE_API_BASE_URL`: `https://api-openmi.domainanda.com` (atau IP VPS Anda `http://ip-vps:3001`)
-4. Klik **Deploy**. Dashboard OpenMi siap diakses dari mana saja.
+   - `VITE_API_BASE_URL`: URL backend VPS Anda (misalnya `https://api.domainanda.com` atau `http://ip-vps:3001`)
+4. Klik **Deploy**. Dashboard OpenMi siap diakses.
 
 ---
 
-## 🧪 Menjalankan Test Suite
+## Menjalankan Test Suite
 
 ```bash
 # Test backend (100% native bun:test)
@@ -131,4 +142,4 @@ bun test
 cd ../frontend
 bun run build
 ```
-Semua test dijalankan tanpa emulator/container pihak ketiga, super cepat (< 1 detik).
+Semua unit test dijalankan tanpa emulator/container pihak ketiga, cepat (< 100 ms).

@@ -1,104 +1,77 @@
-# OpenMi — Authentication Guide
+# Panduan Ekstraksi Kredensial Xiaomi (Cookie Auth)
 
-OpenMi membutuhkan session cookie dari akun Xiaomi Anda. Berikut cara mendapatkannya.
-
----
-
-## Cookie yang Dibutuhkan
-
-Minimal:
-```
-cUserId=XXXXXXXXXX; serviceToken=YYYYYYYYYYYY
-```
-
-Opsional (mungkin diperlukan):
-```
-{sid}_slh=ZZZZ; {sid}_ph=WWWW
-```
+Dokumen ini menjelaskan cara mendapatkan `cUserId` dan `serviceToken` akun Xiaomi untuk didaftarkan ke dalam dashboard OpenMi.
 
 ---
 
-## Metode 1: HTTP Toolkit (Direkomendasikan)
+## 1. Mengapa Perlu Input Cookie Manual?
 
-**Kelebihan:** Paling mudah, auto-decrypt HTTPS.
+Endpoint login resmi Xiaomi (`account.xiaomi.com`) menerapkan verifikasi captcha interaktif (Geetest) dan One-Time Password (OTP) via SMS. Menjalankan proses login otomatis dari server VPS tanpa interaksi manusia berisiko tinggi memicu pemblokiran IP atau penangguhan akun oleh sistem anti-fraud Xiaomi.
 
-1. Download & install [HTTP Toolkit](https://httptoolkit.com/) di PC
-2. Buka HTTP Toolkit → pilih "Android Device via ADB"
-3. HP terhubung via USB dengan USB Debugging aktif
-4. Buka Xiaomi Community app di HP
-5. Navigate ke halaman Bootloader Unlock
-6. Di HTTP Toolkit, filter request ke `new.c.mi.com`
-7. Klik salah satu request → tab "Headers"
-8. Copy value dari header `Cookie`
-9. Simpan ke `config.json` (lihat format di bawah)
-
-## Metode 2: mitmproxy
-
-1. Install mitmproxy: `pip install mitmproxy`
-2. Jalankan: `mitmweb --listen-port 8080`
-3. Set proxy di HP: IP komputer, port 8080
-4. Install CA cert mitmproxy di HP (buka `mitm.it` dari browser HP)
-5. Buka Xiaomi Community app → halaman Bootloader
-6. Di mitmweb, cari request ke `new.c.mi.com`
-7. Copy Cookie header
-
-## Metode 3: Browser DevTools
-
-1. Buka Chrome/Edge di PC
-2. Login ke akun Xiaomi di `https://account.xiaomi.com`
-3. Buka `https://new.c.mi.com/global/embedded/app/bl/lock`
-4. Tekan F12 → tab Network
-5. Refresh halaman
-6. Klik request pertama → Headers → Cookie
-7. Copy seluruh cookie string
+Menggunakan session cookie dari sesi login resmi yang sudah terverifikasi:
+- Tidak memicu kecurigaan anti-fraud Xiaomi.
+- Hanya perlu diinput **sekali** saat mendaftarkan akun di dashboard.
+- Disimpan di database lokal VPS (`openmi.sqlite`) dan akan terus digunakan otomatis oleh scheduler setiap pukul 23:00 WIB hingga sesi tersebut kedaluwarsa.
 
 ---
 
-## Format Config
+## 2. Kredensial yang Dibutuhkan
 
-Simpan cookie di `config.json` (di root project):
+Pada form **Add Account** di dashboard OpenMi, Anda hanya perlu mengisi dua parameter utama:
 
-```json
-{
-  "cookie": "cUserId=XXXXXXXXXX; serviceToken=YYYYYYYYYYYY",
-  "region": "global",
-  "target_hour": 23,
-  "target_minute": 0,
-  "target_second": 0,
-  "concurrent_requests": 5,
-  "pre_connect_seconds": 10
-}
-```
-
-| Field | Keterangan |
-|-------|------------|
-| `cookie` | Cookie string dari akun Xiaomi |
-| `region` | Region app: `global`, `id`, dll |
-| `target_hour` | Jam target (WIB) — default 23 |
-| `target_minute` | Menit target — perlu diverifikasi via polling |
-| `target_second` | Detik target — perlu diverifikasi via polling |
-| `concurrent_requests` | Jumlah request paralel |
-| `pre_connect_seconds` | Detik sebelum target untuk pre-connect |
+| Parameter | Contoh Nilai | Keterangan |
+|---|---|---|
+| `cUserId` | `6182930123` | ID Akun Xiaomi berupa deretan angka |
+| `serviceToken` | `AQAA...` atau string alfanumerik panjang | Token otorisasi layanan Xiaomi Community |
 
 ---
 
-## Verifikasi Cookie
+## 3. Cara Mendapatkan Cookie
 
-Test apakah cookie valid:
+Pilih salah satu metode berikut:
 
-```bash
-curl -s "https://new.c.mi.com/global/user/bl-switch/state" \
-  -H "Cookie: cUserId=XXX; serviceToken=YYY" \
-  -H "User-Agent: Mozilla/5.0 XiaoMi/MiuiBrowser/4.3"
-```
+### Metode A: Melalui Browser PC (Paling Mudah, Tanpa Tools Tambahan)
 
-Response `"code": 0` = cookie valid. Error code = expired/invalid.
+1. Buka browser (Google Chrome, Microsoft Edge, atau Firefox) di PC.
+2. Login ke akun Xiaomi Anda di:  
+   `https://account.xiaomi.com`
+3. Setelah berhasil login, buka halaman permohonan unlock bootloader di tab yang sama:  
+   - Akun Global: `https://new.c.mi.com/global/embedded/app/bl/lock`  
+   - Akun Indonesia: `https://new.c.mi.com/id/embedded/app/bl/lock`
+4. Buka **Developer Tools** dengan menekan tombol `F12` (atau klik kanan di halaman mana saja lalu pilih **Inspect**).
+5. Masuk ke tab penyimpanan:
+   - **Chrome / Edge**: Klik tab **Application** di bar atas DevTools -> di panel kiri buka menu **Storage** -> **Cookies** -> klik `https://new.c.mi.com`.
+   - **Firefox**: Klik tab **Storage** -> **Cookies** -> `https://new.c.mi.com`.
+6. Cari baris dengan nama cookie berikut:
+   - Cari baris **`cUserId`** -> salin nilai pada kolom **Value** (contoh: `6182930123`).
+   - Cari baris **`serviceToken`** -> salin nilai pada kolom **Value**.
+7. Masukkan kedua nilai tersebut ke form **Add Account** di dashboard OpenMi.
 
 ---
 
-## Catatan
+### Metode B: Melalui Aplikasi Android (Reqable / HTTP Toolkit)
 
-- Cookie akan expire — refresh sebelum setiap penggunaan
-- `serviceToken` adalah credential utama
-- Jangan share cookie — setara dengan password
-- Login ulang di app bisa membuat cookie sebelumnya invalid
+Jika Anda ingin mengambil cookie langsung dari aplikasi resmi **Xiaomi Community** di HP:
+
+#### Menggunakan Reqable:
+1. Install [Reqable](https://reqable.com/) di PC dan instal modul CA certificate di perangkat Android.
+2. Aktifkan proxy capture di Reqable.
+3. Buka aplikasi **Xiaomi Community** di HP -> navigasikan ke menu **Me** -> **Unlock Bootloader**.
+4. Di jendela Reqable pada PC, filter request dengan domain `new.c.mi.com`.
+5. Buka salah satu request (misalnya `GET /user/bl-switch/state`) -> buka tab **Request Headers**.
+6. Periksa bagian header `Cookie`:
+   - Ambil nilai setelah `cUserId=...;`
+   - Ambil nilai setelah `serviceToken=...;`
+
+---
+
+## 4. Memverifikasi Masa Aktif Cookie
+
+Setelah mendaftarkan akun di dashboard:
+1. Klik tombol **Test Cookie** pada kartu akun di dashboard OpenMi.
+2. Sistem akan memanggil endpoint `GET /user/bl-switch/state` ke server Xiaomi.
+3. Jika status menampilkan **Valid (Hijau)**, sesi Anda aktif dan scheduler siap mengeksekusi apply pada pukul 23:00:00 WIB.
+
+Jika status menampilkan **Expired (Merah)**:
+- Sesi login telah kedaluwarsa, atau Anda telah logout dari browser/aplikasi resmi.
+- Perbarui nilai `serviceToken` melalui tombol **Edit** (ikon pensil) pada kartu akun di dashboard.
