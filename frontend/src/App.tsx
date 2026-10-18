@@ -89,7 +89,7 @@ export function App() {
   const activeAccountsCount = accounts.filter((a) => a.autoApplyEnabled === 1).length;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
       <Header
         isSseConnected={isSseConnected}
         onLogout={logout}
@@ -104,11 +104,11 @@ export function App() {
             {/* Action Bar */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Users className="w-5 h-5 text-orange-500" />
+                <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-orange-600" />
                   Managed Xiaomi Accounts
                 </h1>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5">
                   {accounts.length} registered • {activeAccountsCount} armed for 23:00 WIB
                 </p>
               </div>
@@ -118,7 +118,7 @@ export function App() {
                   setEditingAccount(null);
                   setIsModalOpen(true);
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-semibold shadow-lg shadow-orange-600/20 transition"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-semibold shadow-sm shadow-orange-600/30 transition cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Account</span>
@@ -127,9 +127,9 @@ export function App() {
 
             {/* Account Cards Grid */}
             {accounts.length === 0 ? (
-              <div className="border border-dashed border-slate-800 rounded-xl p-10 text-center text-slate-500 bg-slate-900/40">
-                <Cpu className="w-10 h-10 mx-auto mb-3 opacity-40 text-orange-400" />
-                <h3 className="text-sm font-semibold text-slate-300">No Xiaomi accounts added</h3>
+              <div className="border border-dashed border-slate-300 rounded-xl p-10 text-center text-slate-500 bg-white shadow-xs">
+                <Cpu className="w-10 h-10 mx-auto mb-3 opacity-50 text-orange-600" />
+                <h3 className="text-sm font-semibold text-slate-800">No Xiaomi accounts added</h3>
                 <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
                   Click "Add Account" above to register your first cUserId and serviceToken cookie.
                 </p>
