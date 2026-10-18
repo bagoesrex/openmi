@@ -1,6 +1,6 @@
 import type { Account, ExecutionLog, NewAccountInput } from "../types";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
 
 function getHeaders(token?: string | null): Record<string, string> {
   const headers: Record<string, string> = {

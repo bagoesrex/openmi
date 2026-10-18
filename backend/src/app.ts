@@ -6,12 +6,21 @@ import { createAccountsApi } from "./api/accounts";
 import { createLogsApi } from "./api/logs";
 
 export function createApp(db: Database) {
+  const corsOriginEnv = process.env.CORS_ORIGIN;
+  let corsOrigin: any = true;
+  if (corsOriginEnv && corsOriginEnv !== "*") {
+    corsOrigin = corsOriginEnv.includes(",")
+      ? corsOriginEnv.split(",").map((s) => s.trim())
+      : corsOriginEnv.trim();
+  }
+
   return new Elysia()
     .use(
       cors({
-        origin: true, // Allow frontend Vercel origin
+        origin: corsOrigin, // Reflect incoming origin by default or restrict to configured domains
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
+        credentials: true,
       })
     )
     .onError(({ code, error, set }) => {
