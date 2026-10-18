@@ -21,35 +21,47 @@ export function createLogsApi(db: Database) {
             const limit = query.limit ? parseInt(query.limit as string, 10) : 100;
             return logRepo.getRecent(limit);
           })
-          .get("/api/logs/stream", ({ set }) => {
-            set.headers["Content-Type"] = "text/event-stream";
-            set.headers["Cache-Control"] = "no-cache";
-            set.headers["Connection"] = "keep-alive";
+          .get("/api/logs/stream", () => {
+            let unsubscribe: (() => void) | null = null;
+            let pingInterval: any = null;
 
             // Return a readable stream for Server-Sent Events
-            return new ReadableStream({
+            const stream = new ReadableStream({
               start(controller) {
                 // Send initial keepalive
                 controller.enqueue(new TextEncoder().encode(`: connected\n\n`));
 
-                const unsubscribe = logBroadcaster.subscribe((log) => {
+                unsubscribe = logBroadcaster.subscribe((log) => {
                   try {
                     const data = `data: ${JSON.stringify(log)}\n\n`;
                     controller.enqueue(new TextEncoder().encode(data));
-                  } catch (err) {
-                    unsubscribe();
+                  } catch {
+                    if (unsubscribe) unsubscribe();
                   }
                 });
 
                 // Periodic ping every 15s to keep connection alive
-                const pingInterval = setInterval(() => {
+                pingInterval = setInterval(() => {
                   try {
                     controller.enqueue(new TextEncoder().encode(`: ping\n\n`));
                   } catch {
                     clearInterval(pingInterval);
-                    unsubscribe();
+                    if (unsubscribe) unsubscribe();
                   }
                 }, 15000);
+              },
+              cancel() {
+                if (pingInterval) clearInterval(pingInterval);
+                if (unsubscribe) unsubscribe();
+              },
+            });
+
+            return new Response(stream, {
+              headers: {
+                "Content-Type": "text/event-stream; charset=utf-8",
+                "Cache-Control": "no-cache, no-transform",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
               },
             });
           })
