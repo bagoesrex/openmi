@@ -7,3 +7,5 @@ node_modules/
 dist/
 .env
 .superpowers/
+captured-cookies.json
+.chrome-session/

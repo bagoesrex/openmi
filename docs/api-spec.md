@@ -2,12 +2,19 @@
 
 ## Base URL
 
-| Environment | URL |
-|-------------|-----|
-| **Production** | `https://new.c.mi.com/{region}/` |
-| Test | `https://c-new.test.mi.com/{region}/` |
+| Environment | REST API Base URL (Retrofit / Backend) | Web Frontend URL |
+|-------------|----------------------------------------|------------------|
+| **Global / Indonesia / Asia (Default)** | `https://sgp-api.buy.mi.com/bbs/api/{region}/` | `https://new.c.mi.com/{region}/` |
+| **Russia (ru)** | `https://ru-api.buy.mi.com/bbs/api/ru/` | `https://new.c.mi.com/ru/` |
+| **Europe (ams)** | `https://ams-api.buy.mi.com/bbs/api/eu/` | `https://new.c.mi.com/eu/` |
 
-**Region:** `global`, `id` (Indonesia), atau region lain (lihat mapping di app).
+**Catatan Hasil Verifikasi:**
+- Domain `new.c.mi.com` adalah web SPA frontend yang mengembalikan HTML dokumen.
+- Domain `sgp-api.buy.mi.com` adalah backend REST API resmi yang dipanggil oleh aplikasi Xiaomi Community (Retrofit).
+- Header cookie yang wajib disertakan:
+  ```
+  Cookie: cUserId=<cUserId>; serviceToken=<token>; new_bbs_serviceToken=<token>
+  ```
 
 ---
 

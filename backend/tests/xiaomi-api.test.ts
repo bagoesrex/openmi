@@ -5,15 +5,16 @@ import { formatXiaomiHeaders, buildXiaomiUrl } from "../src/services/xiaomi/clie
 describe("Xiaomi API Client & State Machine", () => {
   it("should construct correct Xiaomi Community headers and URLs", () => {
     const headers = formatXiaomiHeaders("123456", "token_abc");
-    expect(headers["Cookie"]).toBe("cUserId=123456; serviceToken=token_abc");
+    expect(headers["Cookie"]).toContain("cUserId=123456; serviceToken=token_abc");
+    expect(headers["Cookie"]).toContain("new_bbs_serviceToken=token_abc");
     expect(headers["User-Agent"]).toContain("XiaoMi/MiuiBrowser/4.3");
     expect(headers["Content-Type"]).toBe("application/json");
 
     const urlGlobal = buildXiaomiUrl("global", "apply/bl-auth");
-    expect(urlGlobal).toBe("https://new.c.mi.com/global/apply/bl-auth");
+    expect(urlGlobal).toBe("https://sgp-api.buy.mi.com/bbs/api/global/apply/bl-auth");
 
     const urlId = buildXiaomiUrl("id", "user/bl-switch/state");
-    expect(urlId).toBe("https://new.c.mi.com/id/user/bl-switch/state");
+    expect(urlId).toBe("https://sgp-api.buy.mi.com/bbs/api/id/user/bl-switch/state");
   });
 
   it("should correctly classify and produce diagnostic explanations for all 7 applyResult codes", () => {

@@ -6,7 +6,7 @@ export const DEFAULT_USER_AGENT =
 
 export function formatXiaomiHeaders(cUserId: string, serviceToken: string): Record<string, string> {
   return {
-    "Cookie": `cUserId=${cUserId}; serviceToken=${serviceToken}`,
+    "Cookie": `cUserId=${cUserId}; serviceToken=${serviceToken}; new_bbs_serviceToken=${serviceToken}`,
     "User-Agent": DEFAULT_USER_AGENT,
     "Content-Type": "application/json",
     "Accept": "application/json, text/plain, */*",
@@ -16,7 +16,15 @@ export function formatXiaomiHeaders(cUserId: string, serviceToken: string): Reco
 export function buildXiaomiUrl(region: string, path: string): string {
   const cleanRegion = (region || "global").trim().toLowerCase();
   const cleanPath = path.startsWith("/") ? path.slice(1) : path;
-  return `https://new.c.mi.com/${cleanRegion}/${cleanPath}`;
+
+  let host = "https://sgp-api.buy.mi.com/bbs/api";
+  if (cleanRegion === "ru") {
+    host = "https://ru-api.buy.mi.com/bbs/api";
+  } else if (cleanRegion === "eu" || cleanRegion === "es" || cleanRegion === "it" || cleanRegion === "fr" || cleanRegion === "de") {
+    host = "https://ams-api.buy.mi.com/bbs/api";
+  }
+
+  return `${host}/${cleanRegion}/${cleanPath}`;
 }
 
 export interface RequestOptions {
