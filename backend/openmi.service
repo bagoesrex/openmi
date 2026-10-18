@@ -1,0 +1,23 @@
+[Unit]
+Description=OpenMi Bootloader Unlock Automation Daemon
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/openmi/backend
+ExecStart=/root/.bun/bin/bun src/index.ts
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+EnvironmentFile=/var/www/openmi/backend/.env
+
+# Security Sandbox
+LimitNOFILE=65536
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=openmi
+
+[Install]
+WantedBy=multi-user.target
