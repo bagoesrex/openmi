@@ -4,9 +4,16 @@ import { XiaomiApiResponse } from "./state-machine";
 export const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (Linux; Android 14; 23117PN0CG Build/UKQ1.230804.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/128.0.6613.88 Mobile Safari/537.36 XiaoMi/MiuiBrowser/4.3";
 
+export function normalizeServiceToken(token: string): string {
+  if (!token) return "";
+  const trimmed = token.trim();
+  return trimmed.includes("%") ? trimmed : encodeURIComponent(trimmed);
+}
+
 export function formatXiaomiHeaders(cUserId: string, serviceToken: string): Record<string, string> {
+  const safeToken = normalizeServiceToken(serviceToken);
   return {
-    "Cookie": `cUserId=${cUserId}; serviceToken=${serviceToken}; new_bbs_serviceToken=${serviceToken}`,
+    "Cookie": `cUserId=${cUserId.trim()}; serviceToken=${safeToken}; new_bbs_serviceToken=${safeToken}`,
     "User-Agent": DEFAULT_USER_AGENT,
     "Content-Type": "application/json",
     "Accept": "application/json, text/plain, */*",
