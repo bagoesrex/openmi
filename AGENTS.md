@@ -72,16 +72,18 @@ The quota reset time is **00:00:00 GMT+8 (Beijing Time)**, which is exactly **23
 *Proof*: Decompiled APK string resource `str_bl_limit_reached_tips` contains:
 > `"Application quota limit reached,please try again after %1$s (mm/dd) %2$s (GMT+8)"`
 
-### Endpoints
-- **Base URL**: `https://new.c.mi.com/{region}/` (default `global`, or `id`)
+### Endpoints & Hosts
+- **REST API Base URL**: `https://sgp-api.buy.mi.com/bbs/api/{region}/` (default `global`, or `id`)
+- **Web Frontend CDN**: `https://new.c.mi.com/{region}/` (H5 / WebView UI only, returns HTML)
 - `GET bl-switch/value`: Global feature toggle check
 - `GET user/bl-switch/state`: Checks user eligibility, button state, and unlock pass status
 - `POST apply/bl-auth`: Applies for unlock authorization. Payload: `{"is_retry": false}` on first attempt, `{"is_retry": true}` on retry.
 
 ### Headers Required
-- `Cookie: cUserId=<id>; serviceToken=<token>`
+- `Cookie: cUserId=<id>; serviceToken=<token>; new_bbs_serviceToken=<token>`
 - `User-Agent: Mozilla/5.0 ... XiaoMi/MiuiBrowser/4.3` (suffix required)
 - `Content-Type: application/json`
+- `Accept: application/json, text/plain, */*`
 
 ### Result Codes (`applyResult`)
 - `1`: **Success** (`passResult`) — Stop, record success.
@@ -97,8 +99,8 @@ The quota reset time is **00:00:00 GMT+8 (Beijing Time)**, which is exactly **23
 ## 4. Execution Timing Strategy
 
 The VPS backend execution engine follows this timing lifecycle:
-1. **Continuous**: Periodic NTP synchronization (`pool.ntp.org`) to calibrate local system clock drift to ±10ms.
-2. **T-10s (22:59:50 WIB)**: Pre-warm TLS connection (open socket to `new.c.mi.com`) to eliminate DNS + TLS handshake latency at zero-hour.
+1. **Continuous**: Periodic NTP synchronization (`pool.ntp.org` / edge trace) to calibrate local system clock drift to ±10ms.
+2. **T-10s (22:59:50 WIB)**: Pre-warm TLS connection (open socket to `sgp-api.buy.mi.com`) to eliminate DNS + TLS handshake latency at zero-hour.
 3. **T-5s (22:59:55 WIB)**: Pre-check `GET user/bl-switch/state` to confirm session validity.
 4. **T-0s (23:00:00.000 WIB)**: Fire primary `POST apply/bl-auth` (`is_retry: false`).
 5. **T+0s to T+3s**: State machine handles response. If code 5 or 7, fire retry (`is_retry: true`). If code 1, 2, 3, or 4, conclude execution immediately.
@@ -138,9 +140,13 @@ All commits in this repository MUST follow the Conventional Commits specificatio
 - [x] Design multi-account architecture & tech stack (Bun + Elysia + React Vite)
 - [x] Verify exact quota timing (00:00 GMT+8 = 23:00 WIB)
 - [x] Document development guidelines in `AGENTS.md`
-- [ ] **Milestone 1**: Backend setup (Bun, Elysia, SQLite schema, JWT auth)
-- [ ] **Milestone 2**: Xiaomi API client & state machine engine
-- [ ] **Milestone 3**: Precision scheduler & NTP time sync
-- [ ] **Milestone 4**: Frontend setup (Bun, React, Vite, Tailwind CSS)
-- [ ] **Milestone 5**: Dashboard UI (Account management, status cards, countdown, SSE log viewer)
-- [ ] **Milestone 6**: End-to-end testing & deployment configuration (VPS systemd / Vercel config)
+- [x] **Milestone 1**: Backend setup (Bun, Elysia, SQLite schema, JWT auth)
+- [x] **Milestone 2**: Xiaomi API client & state machine engine
+- [x] **Milestone 3**: Precision scheduler & NTP time sync
+- [x] **Milestone 4**: Frontend setup (Bun, React 19, Vite, Tailwind CSS Light Theme)
+- [x] **Milestone 5**: Dashboard UI (Account management, status cards, countdown, SSE log viewer)
+- [x] **Milestone 6**: End-to-end testing & deployment configuration (VPS systemd / Vercel config)
+- [x] **Milestone 7**: Dual-token header (`new_bbs_serviceToken`), REST host fix (`sgp-api`), & URL-token normalizer
+- [x] **Milestone 8**: Interactive browser session capture tool (`bun run capture`)
+- [x] **Milestone 9**: Full-stack Playwright automated test runner (`bun run test:e2e`)
+- [x] **Milestone 10**: Permanent SQLite log clearing (`DELETE /api/logs`)

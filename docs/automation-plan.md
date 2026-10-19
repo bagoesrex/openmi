@@ -1,107 +1,75 @@
-# OpenMi — Development Plan
+# OpenMi — Architecture & Automation Plan
 
-## Motivasi
-
-Proses apply unlock bootloader melalui UI Xiaomi Community app sering gagal karena tingginya traffic pada waktu tertentu, menyebabkan app tidak responsif. OpenMi mengakses API yang sama secara langsung untuk pengalaman yang lebih reliable.
+Dokumen ini menjelaskan strategi automasi, arsitektur teknis, dan alur eksekusi presisi tinggi yang diterapkan pada platform OpenMi.
 
 ---
 
-## Roadmap
+## 1. Latar Belakang & Motivasi
 
-### Phase 1: Setup Autentikasi
-- Capture session cookie melalui HTTP Toolkit / mitmproxy
-- Extract cookie: `cUserId` + `serviceToken`
-- Simpan di `config.json`
-- Lihat detail: `docs/auth-guide.md`
+Mekanisme permohonan kuota resmi bootloader unlock Xiaomi memiliki karakteristik kritis:
+* Kuota harian dibuka sekali per hari tepat pada pukul **00:00:00 GMT+8 (Beijing Time)** = **23:00:00 WIB**.
+* Kuota habis dalam hitungan 1 hingga 3 detik di seluruh dunia.
+* Melakukan apply melalui antarmuka visual aplikasi Xiaomi Community di smartphone sering mengalami kegagalan karena *render lag* WebView, interaksi sentuhan yang lambat, dan waktu negosiasi TLS/DNS yang terlambat.
 
-### Phase 2: API Monitoring
-- Script monitoring `GET user/bl-switch/state` secara periodik
-- Log perubahan `buttonState`
-- Identifikasi window waktu saat API available
-- Jalankan beberapa kali untuk verifikasi konsistensi
-
-### Phase 3: CLI Tool & Backend
-- CLI tool untuk apply via command line
-- Backend API server untuk manage session & scheduling
-- Fitur:
-  - **Time sync** — sinkronisasi waktu dengan server NTP
-  - **Connection pooling** — reuse koneksi TCP+TLS
-  - **Concurrent requests** — kirim beberapa request paralel
-  - **Response handling** — logic berdasarkan `applyResult` code
-  - **Logging** — semua response di-log ke file
-  - **Notification** — desktop notification saat berhasil
-
-### Phase 4: Frontend Dashboard & Reliability
-- Web dashboard untuk monitoring status & trigger apply
-- HTTP/2 support
-- Minimal request overhead
-- Configurable retry strategy
-- Optional remote deployment
+**Solusi OpenMi**: Memindahkan seluruh proses eksekusi ke background VPS berkecepatan tinggi yang berkomunikasi langsung dengan REST API Xiaomi melalui socket ter-prewarm tepat pada milidetik ke-0.
 
 ---
 
-## Arsitektur
+## 2. Arsitektur Sistem
+
+OpenMi mengadopsi prinsip **Clean Architecture** berbasis 100% ekosistem **Bun**:
 
 ```
 openmi/
-├── scripts/
-│   ├── config.json              # Session config
-│   ├── monitor.py               # API state monitoring
-│   └── apply.py                 # CLI apply tool
-├── backend/
-│   ├── api/                     # REST API endpoints
-│   ├── services/                # Business logic
-│   └── scheduler/               # Timed job runner
-├── frontend/
+├── backend/                       # Headless Daemon Service (Linux VPS)
 │   ├── src/
-│   │   ├── pages/               # Dashboard pages
-│   │   └── components/          # UI components
-│   └── ...
-└── shared/
-    ├── api.py                   # HTTP client wrapper
-    ├── timing.py                # NTP sync & precision timing
-    └── notify.py                # Notification handler
+│   │   ├── domain/                # Entitas Inti: Account & Log
+│   │   ├── db/                    # bun:sqlite schema, client, & repositories
+│   │   ├── services/
+│   │   │   ├── xiaomi/            # REST Client (sgp-api) & 7-Code State Machine
+│   │   │   ├── ntp.ts             # Cloudflare trace sub-second time sync (±10ms)
+│   │   │   ├── scheduler.ts       # Precision countdown & zero-hour execution
+│   │   │   └── broadcaster.ts     # Real-time SSE event bus
+│   │   ├── api/                   # REST Routes (Auth JWT, Accounts CRUD, Logs)
+│   │   ├── app.ts                 # Elysia Application Definition & CORS
+│   │   └── index.ts               # Daemon Entrypoint & Graceful Shutdown
+│   ├── scripts/
+│   │   ├── capture-cookies.ts     # Interactive Chrome cookie capture tool
+│   │   └── run-e2e.ts             # Full-Stack Playwright automated test runner
+│   └── tests/                     # Unit & Integration tests (bun:test)
+├── frontend/                      # Web Control Dashboard (Vercel SPA)
+│   ├── src/
+│   │   ├── components/            # Header, AccountCard, AccountModal, LogTerminal, LoginView
+│   │   ├── hooks/                 # useAuth, useSSE
+│   │   ├── lib/                   # API client wrapper
+│   │   └── App.tsx                # Dashboard layout & state orchestration
+│   ├── vite.config.ts             # Vite configuration with tailwindcss
+│   └── package.json
+└── docs/                          # Technical Specifications & Guides
 ```
 
 ---
 
-## Request Flow
+## 3. Strategi Waktu Eksekusi (Zero-Hour Execution Lifecycle)
 
-```
-[T-10s]  Setup: buka koneksi ke new.c.mi.com
-[T-5s]   Check: GET user/bl-switch/state → verifikasi status
-[T-0s]   Apply: POST apply/bl-auth (concurrent)
-         │
-         ├─ applyResult=1 → ✅ Berhasil — notifikasi & selesai
-         ├─ applyResult=3 → Limit tercapai — selesai
-         ├─ applyResult=5 → Gagal — retry (is_retry=true)
-         ├─ applyResult=6 → Rate limited — tunggu 60s, retry
-         ├─ applyResult=7 → Sementara gagal — retry
-         └─ applyResult=2,4 → Cooldown — selesai
-         │
-[T+1-3s] Retry jika diperlukan
-[T+10s]  Timeout → log hasil
-```
+Untuk memastikan request mendarat di server Xiaomi pada detik pertama kuota dibuka, scheduler OpenMi menjalankan siklus hidup berikut:
+
+| Titik Waktu | Nama Tahapan | Aksi Teknis |
+|---|---|---|
+| **Berkala (Tiap Jam)** | **NTP Clock Sync** | Menghubungi edge trace time service untuk mengkalibrasi offset jam lokal VPS (toleransi drift < 10ms). |
+| **T-10 Detik (22:59:50 WIB)** | **TLS Pre-warming** | Membuka koneksi TCP + TLS handshake awal ke `https://sgp-api.buy.mi.com` agar saat jam 23:00 tidak ada latensi DNS lookup atau handshake TLS. |
+| **T-5 Detik (22:59:55 WIB)** | **Pre-flight Healthcheck** | Memanggil `GET user/bl-switch/state` untuk memverifikasi validitas sesi cookie semua akun aktif. |
+| **T-0 Detik (23:00:00.000 WIB)** | **Zero-Hour Fire** | Mengirimkan request paralel `POST apply/bl-auth` (`{"is_retry": false}`) secara instan untuk seluruh akun yang diaktifkan (`auto_apply_enabled: 1`). |
+| **T+0.2s s.d. T+3s** | **State Machine Processing** | Menganalisis kode hasil. Jika menerima kode 5 (*Transient failure*) atau kode 7 (*Server busy*), scheduler otomatis menembak retry `{"is_retry": true}` dalam rentang 300ms. |
 
 ---
 
-## Considerations
+## 4. Keandalan & Penanganan Error Diagnostik
 
-| Area | Approach |
-|------|----------|
-| Session expiry | Verify cookie sebelum setiap run |
-| API availability window | Konfirmasi via monitoring |
-| Request rate | Batasi concurrent requests |
-| Timeout | 5s per-request |
-| Connection failure | Retry dengan backoff |
-
----
-
-## Checklist
-
-- [ ] Setup autentikasi (Phase 1)
-- [ ] Jalankan monitoring (Phase 2)
-- [ ] Build & test CLI tool (Phase 3)
-- [ ] Dry-run
-- [ ] Production run
-- [ ] Optimasi jika diperlukan (Phase 4)
+Setiap aktivitas, pengujian, maupun eksekusi permohonan kuota dicatat ke database SQLite `openmi.sqlite` dan disiarkan langsung melalui Server-Sent Events (SSE) dengan metadata lengkap:
+* `timestamp`: Unix timestamp milidetik.
+* `action`: Jenis aksi (`CHECK_STATE`, `APPLY_AUTH`, `PRE_WARM`).
+* `result_code`: Kode integer respons Xiaomi (`0`, `1`, `2`, `3`, `5`, `6`, `7`, `100004`).
+* `raw_payload`: Body JSON mentah dari server Xiaomi.
+* `error_details`: Catatan analisis teknis yang dapat dibaca manusia maupun AI coding agent untuk troubleshooting.
+* `clear_logs`: Dukungan endpoint `DELETE /api/logs` untuk mengosongkan riwayat log secara permanen di database.
