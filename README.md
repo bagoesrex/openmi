@@ -8,6 +8,24 @@ Platform ini dibangun sepenuhnya di atas ekosistem **Bun** dengan Clean Architec
 
 ---
 
+## Disclaimer & Kompatibilitas Versi
+
+Platform OpenMi dibangun dan divalidasi berdasarkan hasil rekayasa balik (*reverse engineering*) pada aplikasi resmi:
+* **Basis Versi Aplikasi**: **Xiaomi Community v5.4.40** (Build `500440`, Package `com.mi.global.bbs`).
+* **Status**: Versi `5.4.40` saat ini merupakan rilis resmi paling mutakhir dari Xiaomi Inc.
+
+### Catatan Penting untuk Versi Mendatang:
+Seluruh pemetaan endpoint REST API (`sgp-api.buy.mi.com`), format otorisasi dual-token (`serviceToken` & `new_bbs_serviceToken`), struktur payload apply, serta state machine 7-kode respons pada proyek ini mengacu pada arsitektur versi `5.4.40`. 
+
+Apabila Xiaomi merilis pembaruan aplikasi versi yang lebih tinggi di masa mendatang (misalnya `v5.5.x` atau versi mayor berikutnya), pihak Xiaomi berpotensi mengubah protokol komunikasi, skema enkripsi/signature, atau parameter endpoint. Jika hal tersebut terjadi, OpenMi mungkin memerlukan pembaruan penyesuaian (*compatibility patch*). Pengguna dipersilakan membuka *Issue* di GitHub jika menemukan ketidaksesuaian respons pada rilis Xiaomi Community yang lebih baru.
+
+### Tautan Pemantauan Versi Resmi:
+Pengguna dapat memeriksa versi terkini aplikasi Xiaomi Community melalui tautan publik berikut:
+* **Google Play Store**: [Xiaomi Community di Google Play Store](https://play.google.com/store/apps/details?id=com.mi.global.bbs)
+* **Riwayat Versi (APKPure)**: [Xiaomi Community Version History di APKPure](https://apkpure.com/xiaomi-community/com.mi.global.bbs/versions)
+
+---
+
 ## Fitur Utama
 
 1. **Multi-Account Management**: Kelola banyak akun Xiaomi sekaligus (Label, Region `global`/`id`, `cUserId`, `serviceToken`, dan opsi outbound Proxy).

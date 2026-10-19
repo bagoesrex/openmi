@@ -2,6 +2,8 @@
 
 Dokumen ini merupakan referensi spesifikasi teknis REST API resmi Xiaomi Community yang digunakan oleh OpenMi untuk pengecekan status dan pendaftaran kuota bootloader unlock.
 
+*Basis Rekayasa Balik: Xiaomi Community v5.4.40 (Build 500440, com.mi.global.bbs)*
+
 ---
 
 ## 1. Arsitektur Domain & Base URL

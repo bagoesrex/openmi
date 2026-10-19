@@ -67,6 +67,8 @@ openmi/
 
 ## 3. Verified Xiaomi API Mechanics
 
+*Reverse Engineering Baseline: Xiaomi Community v5.4.40 (Build 500440, Package com.mi.global.bbs)*
+
 ### Quota Timing Verification (Evidence-Based)
 The quota reset time is **00:00:00 GMT+8 (Beijing Time)**, which is exactly **23:00:00 WIB (GMT+7)**.
 *Proof*: Decompiled APK string resource `str_bl_limit_reached_tips` contains:

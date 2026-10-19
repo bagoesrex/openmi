@@ -1,10 +1,12 @@
 # Decompile Summary — Xiaomi-Community.apk
 
-**Tanggal:** 2026-10-18
-**Tool:** JADX (headless)
-**Output:** `C:\Users\bagoe\AppData\Local\Temp\antigravity\xiaomi-decompiled\`
-**Total classes:** 9395
-**Errors:** 86 (normal, tidak mempengaruhi analisis kunci)
+**Target:** Xiaomi Community (`com.mi.global.bbs`)  
+**Versi:** `5.4.40` (Build `500440`, Target SDK 36)  
+**Tanggal:** 2026-10-18  
+**Tool:** JADX (headless)  
+**Output:** `C:\Users\bagoe\AppData\Local\Temp\antigravity\xiaomi-decompiled\`  
+**Total classes:** 9395  
+**Errors:** 86 (normal, tidak mempengaruhi analisis kunci)  
 
 ## File-File Kunci yang Ditemukan
 
