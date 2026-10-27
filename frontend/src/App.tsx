@@ -77,7 +77,6 @@ export function App() {
 
   const handleTestConnection = async (id: string) => {
     const res = await testAccountConnection(id);
-    // Refresh accounts to reflect updated session status
     loadAccounts();
     return res;
   };
@@ -89,7 +88,7 @@ export function App() {
   const activeAccountsCount = accounts.filter((a) => a.autoApplyEnabled === 1).length;
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-100/90 text-slate-900 flex flex-col font-sans selection:bg-orange-100 selection:text-orange-900">
       <Header
         isSseConnected={isSseConnected}
         onLogout={logout}
@@ -97,16 +96,16 @@ export function App() {
         isRefreshing={loadingAccounts}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
           {/* Left Column: Account Management (7 cols) */}
-          <div className="lg:col-span-7 space-y-6">
+          <div className="lg:col-span-7 space-y-4 sm:space-y-5">
             {/* Action Bar */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-orange-600" />
-                  Managed Xiaomi Accounts
+                <h1 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-orange-600 shrink-0" />
+                  <span>Managed Xiaomi Accounts</span>
                 </h1>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {accounts.length} registered • {activeAccountsCount} armed for 23:00 WIB
@@ -118,7 +117,7 @@ export function App() {
                   setEditingAccount(null);
                   setIsModalOpen(true);
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-semibold shadow-sm shadow-orange-600/30 transition cursor-pointer"
+                className="self-start sm:self-auto flex items-center gap-1.5 px-3.5 py-2 bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white rounded-lg text-xs font-semibold shadow-sm shadow-orange-600/30 transition cursor-pointer min-h-[38px]"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Account</span>
@@ -127,15 +126,15 @@ export function App() {
 
             {/* Account Cards Grid */}
             {accounts.length === 0 ? (
-              <div className="border border-dashed border-slate-300 rounded-xl p-10 text-center text-slate-500 bg-white shadow-xs">
+              <div className="border border-dashed border-slate-300 rounded-xl p-8 sm:p-12 text-center text-slate-500 bg-white shadow-xs">
                 <Cpu className="w-10 h-10 mx-auto mb-3 opacity-50 text-orange-600" />
                 <h3 className="text-sm font-semibold text-slate-800">No Xiaomi accounts added</h3>
-                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                  Click "Add Account" above to register your first cUserId and serviceToken cookie.
+                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+                  Click "Add Account" above or use <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono">bun run capture</code> to register your credentials.
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
                 {accounts.map((acc) => (
                   <AccountCard
                     key={acc.id}
