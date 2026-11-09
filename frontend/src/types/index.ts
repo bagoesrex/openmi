@@ -1,3 +1,5 @@
+export type TimingMode = "asia" | "europe" | "single" | "custom";
+
 export interface Account {
   id: string;
   label: string;
@@ -10,6 +12,8 @@ export interface Account {
   lastButtonState?: number | null;
   lastApplyResult?: number | null;
   autoApplyEnabled: number; // 1 = true, 0 = false
+  timingMode?: TimingMode;
+  customTimings?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -22,6 +26,8 @@ export interface NewAccountInput {
   deviceId?: string | null;
   proxyUrl?: string | null;
   autoApplyEnabled?: boolean;
+  timingMode?: TimingMode;
+  customTimings?: string | null;
 }
 
 export interface ExecutionLog {

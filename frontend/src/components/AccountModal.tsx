@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import type { Account, NewAccountInput, QrSessionResponse, QrPollStatus } from "../types";
+import type { Account, NewAccountInput, QrSessionResponse, QrPollStatus, TimingMode } from "../types";
 import { X, ShieldAlert, QrCode, KeyRound, RefreshCw, CheckCircle2, Smartphone } from "lucide-react";
 import { createQrSession, checkQrStatus, cancelQrSession } from "../lib/api";
 
@@ -24,6 +24,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   const [deviceId, setDeviceId] = useState("");
   const [proxyUrl, setProxyUrl] = useState("");
   const [autoApplyEnabled, setAutoApplyEnabled] = useState(true);
+  const [timingMode, setTimingMode] = useState<TimingMode>("asia");
+  const [customTimings, setCustomTimings] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,6 +96,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       setDeviceId(initialAccount.deviceId || "");
       setProxyUrl(initialAccount.proxyUrl || "");
       setAutoApplyEnabled(initialAccount.autoApplyEnabled === 1);
+      setTimingMode(initialAccount.timingMode || "asia");
+      setCustomTimings(initialAccount.customTimings || "");
     } else {
       setActiveTab("qr");
       setLabel("");
@@ -103,6 +107,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       setDeviceId("");
       setProxyUrl("");
       setAutoApplyEnabled(true);
+      setTimingMode("asia");
+      setCustomTimings("");
     }
     setError(null);
     setQrSession(null);
@@ -148,6 +154,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         deviceId: deviceId.trim() || null,
         proxyUrl: proxyUrl.trim() || null,
         autoApplyEnabled,
+        timingMode,
+        customTimings: timingMode === "custom" ? customTimings.trim() || null : null,
       });
       onClose();
     } catch (err: any) {
@@ -331,6 +339,31 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               </div>
 
               <div>
+                <label className="block text-slate-700 font-medium mb-1">
+                  Execution Timing Profile
+                </label>
+                <select
+                  value={timingMode}
+                  onChange={(e) => setTimingMode(e.target.value as TimingMode)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500 text-xs sm:text-sm font-medium"
+                >
+                  <option value="asia">⚡ Asia Burst (58.8s - 59.9s) [Recommended]</option>
+                  <option value="europe">🌍 Europe Burst (58.7s - 59.8s)</option>
+                  <option value="single">🎯 Single Shot (23:00:00 exact)</option>
+                  <option value="custom">⚙️ Custom Offsets (JSON)</option>
+                </select>
+                {timingMode === "custom" && (
+                  <input
+                    type="text"
+                    value={customTimings}
+                    onChange={(e) => setCustomTimings(e.target.value)}
+                    placeholder="e.g. [58.5, 59.0, 59.5, 59.9]"
+                    className="mt-2 w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-mono text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  />
+                )}
+              </div>
+
+              <div>
                 <label className="flex items-center gap-2 cursor-pointer text-slate-700 select-none pt-1">
                   <input
                     type="checkbox"
@@ -454,6 +487,31 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500 text-xs sm:text-sm font-mono"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-medium mb-1">
+                Execution Timing Profile
+              </label>
+              <select
+                value={timingMode}
+                onChange={(e) => setTimingMode(e.target.value as TimingMode)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500 text-xs sm:text-sm font-medium"
+              >
+                <option value="asia">⚡ Asia Burst (58.8s - 59.9s) [Recommended]</option>
+                <option value="europe">🌍 Europe Burst (58.7s - 59.8s)</option>
+                <option value="single">🎯 Single Shot (23:00:00 exact)</option>
+                <option value="custom">⚙️ Custom Offsets (JSON)</option>
+              </select>
+              {timingMode === "custom" && (
+                <input
+                  type="text"
+                  value={customTimings}
+                  onChange={(e) => setCustomTimings(e.target.value)}
+                  placeholder="e.g. [58.5, 59.0, 59.5, 59.9]"
+                  className="mt-2 w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-mono text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-orange-500"
+                />
+              )}
             </div>
 
             <div className="pt-2">

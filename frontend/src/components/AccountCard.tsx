@@ -10,6 +10,7 @@ import {
   Trash2,
   AlertTriangle,
   Smartphone,
+  Zap,
 } from "lucide-react";
 
 interface AccountCardProps {
@@ -18,6 +19,7 @@ interface AccountCardProps {
   onDelete: (id: string) => void;
   onToggleAutoApply: (id: string, enabled: boolean) => void;
   onTestConnection: (id: string) => Promise<any>;
+  onTestBurst?: (id: string) => Promise<any>;
 }
 
 export const AccountCard: React.FC<AccountCardProps> = ({
@@ -26,8 +28,10 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   onDelete,
   onToggleAutoApply,
   onTestConnection,
+  onTestBurst,
 }) => {
   const [testing, setTesting] = useState(false);
+  const [burstTesting, setBurstTesting] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
 
   const handleTest = async () => {
@@ -43,6 +47,23 @@ export const AccountCard: React.FC<AccountCardProps> = ({
       setTestResult({ success: false, message: err.message || "Failed" });
     } finally {
       setTesting(false);
+    }
+  };
+
+  const handleBurstTest = async () => {
+    if (!onTestBurst) return;
+    setBurstTesting(true);
+    setTestResult(null);
+    try {
+      const res = await onTestBurst(account.id);
+      setTestResult({
+        success: true,
+        message: `Burst OK (${res.simulatedShots?.length || 0} shots, profile: ${res.profile})`,
+      });
+    } catch (err: any) {
+      setTestResult({ success: false, message: err.message || "Burst test failed" });
+    } finally {
+      setBurstTesting(false);
     }
   };
 
@@ -93,6 +114,18 @@ export const AccountCard: React.FC<AccountCardProps> = ({
               </h3>
               <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
                 {account.region}
+              </span>
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold tracking-wide bg-amber-50 text-amber-800 border border-amber-200 shrink-0 flex items-center gap-0.5">
+                <Zap className="w-2.5 h-2.5 text-amber-600 fill-amber-500" />
+                <span>
+                  {account.timingMode === "europe"
+                    ? "Europe Burst"
+                    : account.timingMode === "single"
+                    ? "Single Shot"
+                    : account.timingMode === "custom"
+                    ? "Custom"
+                    : "Asia Burst"}
+                </span>
               </span>
             </div>
             <p
@@ -196,15 +229,29 @@ export const AccountCard: React.FC<AccountCardProps> = ({
       </div>
 
       {/* Actions (Touch accessible min-h 36px) */}
-      <div className="flex items-center justify-between pt-1">
-        <button
-          onClick={handleTest}
-          disabled={testing}
-          className="min-h-[34px] flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 active:bg-slate-300/70 text-slate-700 border border-slate-200 transition disabled:opacity-50 cursor-pointer"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${testing ? "animate-spin text-orange-600" : ""}`} />
-          <span>{testing ? "Testing..." : "Test Cookie"}</span>
-        </button>
+      <div className="flex items-center justify-between pt-1 gap-2 flex-wrap sm:flex-nowrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={handleTest}
+            disabled={testing || burstTesting}
+            className="min-h-[34px] flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 active:bg-slate-300/70 text-slate-700 border border-slate-200 transition disabled:opacity-50 cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${testing ? "animate-spin text-orange-600" : ""}`} />
+            <span>{testing ? "Testing..." : "Test Cookie"}</span>
+          </button>
+
+          {onTestBurst && (
+            <button
+              onClick={handleBurstTest}
+              disabled={burstTesting || testing}
+              className="min-h-[34px] flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-50 hover:bg-amber-100 active:bg-amber-200/70 text-amber-800 border border-amber-200 transition disabled:opacity-50 cursor-pointer"
+              title="Dry-run simulated burst wave shots"
+            >
+              <Zap className={`w-3.5 h-3.5 ${burstTesting ? "animate-bounce text-amber-600" : "text-amber-600"}`} />
+              <span>{burstTesting ? "Bursting..." : "Test Burst"}</span>
+            </button>
+          )}
+        </div>
 
         <div className="flex items-center space-x-1">
           <button

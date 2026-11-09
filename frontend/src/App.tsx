@@ -13,6 +13,7 @@ import {
   updateAccount,
   deleteAccount,
   testAccountConnection,
+  testAccountBurst,
 } from "./lib/api";
 import { Plus, Users, Cpu } from "lucide-react";
 
@@ -77,6 +78,12 @@ export function App() {
 
   const handleTestConnection = async (id: string) => {
     const res = await testAccountConnection(id);
+    loadAccounts();
+    return res;
+  };
+
+  const handleTestBurst = async (id: string) => {
+    const res = await testAccountBurst(id);
     loadAccounts();
     return res;
   };
@@ -146,6 +153,7 @@ export function App() {
                     onDelete={handleDeleteAccount}
                     onToggleAutoApply={handleToggleAutoApply}
                     onTestConnection={handleTestConnection}
+                    onTestBurst={handleTestBurst}
                   />
                 ))}
               </div>

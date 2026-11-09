@@ -86,6 +86,20 @@ export async function testAccountConnection(id: string): Promise<any> {
   return res.json();
 }
 
+export async function testAccountBurst(id: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/accounts/${id}/test-burst`, {
+    method: "POST",
+    headers: getHeaders(),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Burst test failed");
+  }
+
+  return res.json();
+}
+
 export async function fetchRecentLogs(limit: number = 50): Promise<ExecutionLog[]> {
   const res = await fetch(`${API_BASE}/api/logs?limit=${limit}`, {
     headers: getHeaders(),
