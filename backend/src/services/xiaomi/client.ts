@@ -1,5 +1,6 @@
 import { Account } from "../../domain/account";
 import { XiaomiApiResponse } from "./state-machine";
+import { formatBurstHeaders } from "./burst";
 
 export const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (Linux; Android 14; 23117PN0CG Build/UKQ1.230804.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/128.0.6613.88 Mobile Safari/537.36 XiaoMi/MiuiBrowser/4.3";
@@ -38,6 +39,7 @@ export interface RequestOptions {
   timeoutMs?: number;
   proxy?: string | null;
   signal?: AbortSignal;
+  deviceId?: string | null;
 }
 
 export async function checkSwitchValue(
@@ -91,7 +93,9 @@ export async function applyBlAuth(
   options?: RequestOptions
 ): Promise<XiaomiApiResponse> {
   const url = buildXiaomiUrl(account.region, "apply/bl-auth");
-  const headers = formatXiaomiHeaders(account.cUserId, account.serviceToken);
+  // Use formatBurstHeaders with deviceId if provided or from account
+  const deviceId = options?.deviceId || account.deviceId || undefined;
+  const headers = formatBurstHeaders(account.cUserId, account.serviceToken, deviceId);
   const body = JSON.stringify({ is_retry: isRetry });
 
   const fetchOptions: any = {
