@@ -232,7 +232,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     src={qrSession.qrUrl}
                     alt="Xiaomi Login QR Code"
                     className={`w-48 h-48 rounded-lg border border-slate-200 shadow-xs object-contain transition-opacity ${
-                      qrStatus === "EXPIRED" ? "opacity-25 grayscale" : "opacity-100"
+                      qrStatus === "EXPIRED" || qrStatus === "ERROR" ? "opacity-25 grayscale" : "opacity-100"
                     }`}
                   />
                   {qrStatus === "SUCCESS" && (
@@ -285,6 +285,24 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     >
                       <RefreshCw className="w-3 h-3" />
                       Refresh
+                    </button>
+                  </div>
+                )}
+                {qrStatus === "ERROR" && (
+                  <div className="flex flex-col items-center gap-1.5 text-xs">
+                    <div className="flex items-center gap-1.5 text-rose-600 font-medium">
+                      <ShieldAlert className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                      <span className="truncate max-w-[240px]" title={qrError || "Authorization failed"}>
+                        {qrError || "Authorization failed"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={startQrSession}
+                      className="inline-flex items-center gap-1 text-xs text-orange-600 font-medium hover:underline cursor-pointer"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      Try Again
                     </button>
                   </div>
                 )}

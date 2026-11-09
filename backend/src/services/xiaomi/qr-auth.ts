@@ -18,16 +18,64 @@ export interface QrPollResult {
   error?: string;
 }
 
-interface InternalSession extends QrSession {
+export class SimpleCookieJar {
+  private cookies = new Map<string, string>();
+
+  public setCookies(setCookieHeaders: string[]): void {
+    for (const header of setCookieHeaders) {
+      if (!header) continue;
+      const part = header.split(";")[0]?.trim();
+      if (!part) continue;
+      const eqIdx = part.indexOf("=");
+      if (eqIdx > 0) {
+        const name = part.slice(0, eqIdx).trim();
+        const value = part.slice(eqIdx + 1).trim();
+        if (value) {
+          this.cookies.set(name, value);
+        }
+      }
+    }
+  }
+
+  public getCookieHeader(): string {
+    return Array.from(this.cookies.entries())
+      .map(([k, v]) => `${k}=${v}`)
+      .join("; ");
+  }
+
+  public get(name: string): string | undefined {
+    return this.cookies.get(name);
+  }
+
+  public toJSON(): Record<string, string> {
+    return Object.fromEntries(this.cookies);
+  }
+}
+
+export function extractSetCookies(res: Response): string[] {
+  if (typeof res.headers.getSetCookie === "function") {
+    const list = res.headers.getSetCookie();
+    if (Array.isArray(list) && list.length > 0) {
+      return list;
+    }
+  }
+  const raw = res.headers.get("set-cookie");
+  return raw ? [raw] : [];
+}
+
+export interface InternalSession extends QrSession {
   status: QrPollStatus;
   cUserId?: string;
   serviceToken?: string;
   error?: string;
   abortController: AbortController;
+  cookieJar: SimpleCookieJar;
 }
 
 const SSO_LONGPOLLING_URL =
   "https://account.xiaomi.com/longPolling/loginUrl?sid=18n_bbs_global&_json=false&callback=https://sgp-api.buy.mi.com/bbs/api/global/user/login-back";
+const SERVICELOGIN_URL = "https://account.xiaomi.com/pass/serviceLogin";
+const SID = "18n_bbs_global";
 const DEFAULT_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -46,6 +94,7 @@ export class QrAuthService {
   }
 
   public async createSession(): Promise<QrSession> {
+    const cookieJar = new SimpleCookieJar();
     const res = await fetch(SSO_LONGPOLLING_URL, {
       headers: {
         "User-Agent": DEFAULT_UA,
@@ -57,9 +106,16 @@ export class QrAuthService {
       throw new Error(`Failed to initialize Xiaomi QR session: HTTP ${res.status}`);
     }
 
+    cookieJar.setCookies(extractSetCookies(res));
+
     const text = await res.text();
     const cleanText = text.startsWith("&&&START&&&") ? text.slice(11) : text;
-    const data = JSON.parse(cleanText);
+    let data: any;
+    try {
+      data = JSON.parse(cleanText);
+    } catch (err: any) {
+      throw new Error(`Invalid QR session payload received from Xiaomi: ${err.message}`);
+    }
 
     if (!data.qr || !data.lp) {
       throw new Error(`Invalid QR session payload received from Xiaomi: ${cleanText}`);
@@ -71,10 +127,11 @@ export class QrAuthService {
       qrUrl: data.qr,
       loginUrl: data.loginUrl || "",
       lpUrl: data.lp,
-      timeout: data.timeout || 300,
+      timeout: typeof data.timeout === "number" ? data.timeout : 300,
       createdAt: Date.now(),
       status: "WAITING",
       abortController: new AbortController(),
+      cookieJar,
     };
 
     this.sessions.set(sessionId, session);
@@ -131,10 +188,12 @@ export class QrAuthService {
         Date.now() - startTime < maxDuration
       ) {
         try {
+          const cookieHeader = session.cookieJar.getCookieHeader();
           const res = await fetch(session.lpUrl, {
             headers: {
               "User-Agent": DEFAULT_UA,
               "Accept": "application/json;charset=UTF-8",
+              ...(cookieHeader ? { Cookie: cookieHeader } : {}),
             },
             signal: session.abortController.signal,
           });
@@ -143,6 +202,8 @@ export class QrAuthService {
             await new Promise((r) => setTimeout(r, 2000));
             continue;
           }
+
+          session.cookieJar.setCookies(extractSetCookies(res));
 
           const text = await res.text();
           const cleanText = text.startsWith("&&&START&&&") ? text.slice(11) : text;
@@ -184,12 +245,36 @@ export class QrAuthService {
     }
   }
 
-  private async finalizeAuth(session: InternalSession, authData: any): Promise<void> {
+  public async finalizeAuth(session: InternalSession, authData: any): Promise<void> {
     try {
-      const nonce = authData.nonce;
-      const ssecurity = authData.ssecurity;
-      const location = authData.location;
-      const userId = authData.userId ? String(authData.userId) : undefined;
+      let nonce = authData?.nonce;
+      let ssecurity = authData?.ssecurity;
+      let location = authData?.location;
+      let userId = authData?.userId ? String(authData.userId) : undefined;
+
+      // Fallback: if tokens are missing from longPolling payload, query serviceLogin
+      if (!location || !nonce || !ssecurity) {
+        const serviceLoginUrl = `${SERVICELOGIN_URL}?sid=${SID}&_json=true`;
+        const cookieHeader = session.cookieJar.getCookieHeader();
+        const slRes = await fetch(serviceLoginUrl, {
+          headers: {
+            "User-Agent": DEFAULT_UA,
+            ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+          },
+        });
+        session.cookieJar.setCookies(extractSetCookies(slRes));
+        const slText = await slRes.text();
+        const cleanSlText = slText.startsWith("&&&START&&&") ? slText.slice(11) : slText;
+        try {
+          const slJson = JSON.parse(cleanSlText);
+          nonce = slJson.nonce || nonce;
+          ssecurity = slJson.ssecurity || ssecurity;
+          location = slJson.location || location;
+          if (slJson.userId) userId = String(slJson.userId);
+        } catch {
+          // ignore parsing error, proceed to check below
+        }
+      }
 
       if (!location || !nonce || !ssecurity) {
         session.status = "ERROR";
@@ -198,35 +283,43 @@ export class QrAuthService {
       }
 
       const clientSign = this.calculateClientSign(nonce, ssecurity);
-      const finalUrl = `${location}&clientSign=${clientSign}`;
+      let currentUrl = `${location}${location.includes("?") ? "&" : "?"}clientSign=${clientSign}`;
 
-      // Call callback URL to extract authentication cookies
-      const res = await fetch(finalUrl, {
-        headers: {
-          "User-Agent": DEFAULT_UA,
-        },
-        redirect: "manual",
-      });
+      // Follow redirect chain, accumulating cookies at each hop until final destination
+      const maxRedirects = 10;
+      let redirectsCount = 0;
 
-      const setCookies = res.headers.getSetCookie?.() || [];
-      const cookieHeader = res.headers.get("set-cookie") || "";
+      while (redirectsCount < maxRedirects) {
+        redirectsCount++;
+        const cookieHeader = session.cookieJar.getCookieHeader();
+        const res = await fetch(currentUrl, {
+          headers: {
+            "User-Agent": DEFAULT_UA,
+            ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+          },
+          redirect: "manual",
+        });
 
-      let extractedToken: string | undefined;
-      let extractedUserId: string | undefined = userId;
+        session.cookieJar.setCookies(extractSetCookies(res));
 
-      // Extract tokens from set-cookie headers
-      const allCookies = [...setCookies, cookieHeader].join("; ");
-      const tokenMatch =
-        allCookies.match(/new_bbs_serviceToken=([^;]+)/) ||
-        allCookies.match(/serviceToken=([^;]+)/);
-      if (tokenMatch) {
-        extractedToken = tokenMatch[1].trim();
+        if (res.status >= 300 && res.status < 400) {
+          const loc = res.headers.get("location");
+          if (!loc) break;
+          currentUrl = new URL(loc, currentUrl).toString();
+          continue;
+        }
+
+        break;
       }
 
-      const userMatch = allCookies.match(/cUserId=([^;]+)/) || allCookies.match(/userId=([^;]+)/);
-      if (userMatch) {
-        extractedUserId = userMatch[1].trim();
-      }
+      const extractedToken =
+        session.cookieJar.get("new_bbs_serviceToken") ||
+        session.cookieJar.get("serviceToken");
+
+      const extractedUserId =
+        session.cookieJar.get("cUserId") ||
+        session.cookieJar.get("userId") ||
+        userId;
 
       if (!extractedToken) {
         session.status = "ERROR";
@@ -235,7 +328,7 @@ export class QrAuthService {
       }
 
       session.serviceToken = extractedToken;
-      session.cUserId = extractedUserId || authData.userId || "";
+      session.cUserId = extractedUserId || "";
       session.status = "SUCCESS";
     } catch (err: any) {
       session.status = "ERROR";
