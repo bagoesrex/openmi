@@ -130,11 +130,25 @@ async function main() {
       }
     }
 
-    // Create a new Account via Modal
+    // Create a new Account via Modal & Verify QR Code Login tab
     const testLabel = `E2E Bot ${Date.now().toString().slice(-4)}`;
     const addAccountBtn = page.locator('button:has-text("Add Account")').first();
     await addAccountBtn.click();
     await page.waitForSelector('text="Register Xiaomi Account"');
+
+    // Verify Scan QR Login tab is displayed by default and loads QR
+    const qrTabActive = await page.locator('button:has-text("Scan QR Login")').isVisible();
+    const qrImgLoaded = await page.waitForSelector('img[alt="Xiaomi Login QR Code"]', { timeout: 6000 }).then(() => true).catch(() => false);
+    if (qrTabActive && qrImgLoaded) {
+      record("Render 'Scan QR Login' tab and load live Xiaomi SSO QR image", true);
+    } else {
+      record("Render 'Scan QR Login' tab and load live Xiaomi SSO QR image", false, `tabActive=${qrTabActive}, imgLoaded=${qrImgLoaded}`);
+    }
+
+    // Switch to Manual Input tab to enter credentials directly
+    await page.click('button:has-text("Manual Input")');
+    await page.waitForSelector('input[placeholder="Xiaomi Account ID"]');
+    record("Switch to 'Manual Input' tab to configure account fields", true);
 
     await page.fill('input[placeholder="e.g. Personal Phone (Xiaomi 14)"]', testLabel);
     await page.fill('input[placeholder="Xiaomi Account ID"]', "e2e_cuser_999");
