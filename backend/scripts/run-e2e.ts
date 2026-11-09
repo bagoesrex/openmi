@@ -164,8 +164,32 @@ async function main() {
       record("Create new account via Modal form", false, "Card not found after submit");
     }
 
-    // Delete the temporary test account
     const testCard = page.locator('.rounded-xl', { hasText: testLabel });
+
+    // Verify Asia Burst profile badge
+    const asiaBadge = await testCard.locator('text="Asia Burst"').first().isVisible().catch(() => false);
+    if (asiaBadge) {
+      record("Render 'Asia Burst' timing profile badge on newly created account card", true);
+    } else {
+      record("Render 'Asia Burst' timing profile badge on newly created account card", false);
+    }
+
+    // Trigger Test Burst simulation
+    const testBurstBtn = testCard.locator('button:has-text("Test Burst")').first();
+    if (await testBurstBtn.isVisible()) {
+      await testBurstBtn.click();
+      const burstFeedback = await page
+        .waitForSelector('text=Burst OK', { timeout: 8000 })
+        .then(() => true)
+        .catch(() => false);
+      if (burstFeedback) {
+        record("Trigger 'Test Burst' dry-run simulation and verify success feedback", true);
+      } else {
+        record("Trigger 'Test Burst' dry-run simulation and verify success feedback", false);
+      }
+    }
+
+    // Delete the temporary test account
     const deleteBtn = testCard.locator('button[title="Delete account"]').first();
     await deleteBtn.click();
     await page.waitForTimeout(1000);

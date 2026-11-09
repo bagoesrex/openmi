@@ -192,30 +192,31 @@ export function createAccountsApi(db: Database) {
 
             const timings = resolveTimings(acc.timingMode, acc.customTimings);
             const simulatedShots = timings.slice(0, 3);
-            const results: any[] = [];
 
-            for (let i = 0; i < simulatedShots.length; i++) {
-              const shotDevId = generateDeviceId();
-              const startTime = Date.now();
-              try {
-                const res = await checkUserState(acc, { timeoutMs: 3000, deviceId: shotDevId });
-                const duration = Date.now() - startTime;
-                results.push({
-                  shot: i + 1,
-                  offset: simulatedShots[i],
-                  deviceId: shotDevId.slice(0, 8),
-                  duration,
-                  status: res.code === 0 ? "OK" : `ERR_${res.code}`,
-                });
-              } catch (err: any) {
-                results.push({
-                  shot: i + 1,
-                  offset: simulatedShots[i],
-                  deviceId: shotDevId.slice(0, 8),
-                  error: err.message,
-                });
-              }
-            }
+            const results = await Promise.all(
+              simulatedShots.map(async (offset, i) => {
+                const shotDevId = generateDeviceId();
+                const startTime = Date.now();
+                try {
+                  const res = await checkUserState(acc, { timeoutMs: 3000, deviceId: shotDevId });
+                  const duration = Date.now() - startTime;
+                  return {
+                    shot: i + 1,
+                    offset,
+                    deviceId: shotDevId.slice(0, 8),
+                    duration,
+                    status: res.code === 0 ? "OK" : `ERR_${res.code}`,
+                  };
+                } catch (err: any) {
+                  return {
+                    shot: i + 1,
+                    offset,
+                    deviceId: shotDevId.slice(0, 8),
+                    error: err.message,
+                  };
+                }
+              })
+            );
 
             const logEntry = {
               accountId: acc.id,
