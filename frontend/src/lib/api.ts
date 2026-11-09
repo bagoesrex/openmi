@@ -1,4 +1,4 @@
-import type { Account, ExecutionLog, NewAccountInput } from "../types";
+import type { Account, ExecutionLog, NewAccountInput, QrSessionResponse, QrStatusResponse } from "../types";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
 
@@ -102,6 +102,40 @@ export async function clearAllLogs(): Promise<void> {
   });
 
   if (!res.ok) throw new Error("Failed to clear logs on server");
+}
+
+export async function createQrSession(): Promise<QrSessionResponse> {
+  const res = await fetch(`${API_BASE}/api/accounts/qr/session`, {
+    method: "POST",
+    headers: getHeaders(),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to initialize QR session");
+  }
+
+  return res.json();
+}
+
+export async function checkQrStatus(sessionId: string): Promise<QrStatusResponse> {
+  const res = await fetch(`${API_BASE}/api/accounts/qr/session/${sessionId}/status`, {
+    headers: getHeaders(),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to check QR status");
+  }
+
+  return res.json();
+}
+
+export async function cancelQrSession(sessionId: string): Promise<void> {
+  await fetch(`${API_BASE}/api/accounts/qr/session/${sessionId}`, {
+    method: "DELETE",
+    headers: getHeaders(),
+  }).catch(() => {});
 }
 
 export function getSSEUrl(token?: string | null): string {

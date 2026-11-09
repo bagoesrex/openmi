@@ -34,3 +34,18 @@ export interface ExecutionLog {
   rawPayload?: string | null;
   errorDetails?: string | null;
 }
+
+export interface QrSessionResponse {
+  sessionId: string;
+  qrUrl: string;
+  timeout: number;
+}
+
+export type QrPollStatus = "WAITING" | "SCANNED" | "SUCCESS" | "EXPIRED" | "ERROR";
+
+export interface QrStatusResponse {
+  status: QrPollStatus;
+  cUserId?: string;
+  serviceToken?: string;
+  error?: string;
+}
