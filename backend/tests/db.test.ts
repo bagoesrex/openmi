@@ -61,6 +61,33 @@ describe("Database & Repositories", () => {
     expect(updated?.customTimings).toBe("[58.5, 59.0]");
   });
 
+  it("auto-migrates existing tables lacking timing_mode and custom_timings", () => {
+    const legacyDb = new (require("bun:sqlite").Database)(":memory:");
+    legacyDb.exec(`
+      CREATE TABLE accounts (
+        id TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        region TEXT NOT NULL DEFAULT 'global',
+        c_user_id TEXT NOT NULL,
+        service_token TEXT NOT NULL,
+        device_id TEXT,
+        proxy_url TEXT,
+        session_valid INTEGER DEFAULT 1,
+        last_button_state INTEGER,
+        last_apply_result INTEGER,
+        auto_apply_enabled INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    const { migrateSchema } = require("../src/db/client");
+    migrateSchema(legacyDb);
+
+    const cols = legacyDb.prepare("PRAGMA table_info(accounts)").all().map((c: any) => c.name);
+    expect(cols).toContain("timing_mode");
+    expect(cols).toContain("custom_timings");
+  });
+
   it("should write and fetch execution logs with diagnostic metadata", () => {
     // Create an account first to satisfy foreign key constraint
     const acc = accountRepo.create({
