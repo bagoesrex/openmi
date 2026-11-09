@@ -109,5 +109,35 @@ describe("Elysia REST API", () => {
     );
     const emptyLogs = await logsAfterClear.json();
     expect(emptyLogs.length).toBe(0);
+
+    // QR Session endpoints
+    const qrSessionRes = await app.handle(
+      new Request("http://localhost/api/accounts/qr/session", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${json.token}` },
+      })
+    );
+    expect(qrSessionRes.status).toBe(200);
+    const qrData = await qrSessionRes.json();
+    expect(qrData.sessionId).toBeDefined();
+    expect(qrData.qrUrl).toContain("account.xiaomi.com");
+
+    // QR Status check
+    const qrStatusRes = await app.handle(
+      new Request(`http://localhost/api/accounts/qr/session/${qrData.sessionId}/status`, {
+        headers: { Authorization: `Bearer ${json.token}` },
+      })
+    );
+    expect(qrStatusRes.status).toBe(200);
+    const qrStatus = await qrStatusRes.json();
+    expect(qrStatus.status).toBe("WAITING");
+
+    // QR Status check for invalid session
+    const qrInvalidRes = await app.handle(
+      new Request("http://localhost/api/accounts/qr/session/unknown-session-id/status", {
+        headers: { Authorization: `Bearer ${json.token}` },
+      })
+    );
+    expect(qrInvalidRes.status).toBe(404);
   });
 });

@@ -4,6 +4,7 @@ import { createAccountRepo, createLogRepo } from "../db/repository";
 import { authPlugin } from "./auth";
 import { checkUserState } from "../services/xiaomi/client";
 import { logBroadcaster } from "../services/broadcaster";
+import { qrAuthService } from "../services/xiaomi/qr-auth";
 
 export function createAccountsApi(db: Database) {
   const accountRepo = createAccountRepo(db);
@@ -21,6 +22,26 @@ export function createAccountsApi(db: Database) {
         app
           .get("/api/accounts", () => {
             return accountRepo.getAll();
+          })
+          .post("/api/accounts/qr/session", async () => {
+            const session = await qrAuthService.createSession();
+            return {
+              sessionId: session.sessionId,
+              qrUrl: session.qrUrl,
+              timeout: session.timeout,
+            };
+          })
+          .get("/api/accounts/qr/session/:sessionId/status", ({ params: { sessionId }, set }) => {
+            const status = qrAuthService.getSessionStatus(sessionId);
+            if (!status) {
+              set.status = 404;
+              return { error: "QR session not found or expired" };
+            }
+            return status;
+          })
+          .delete("/api/accounts/qr/session/:sessionId", ({ params: { sessionId } }) => {
+            qrAuthService.cancelSession(sessionId);
+            return { success: true };
           })
           .get("/api/accounts/:id", ({ params: { id }, set }) => {
             const acc = accountRepo.getById(id);
