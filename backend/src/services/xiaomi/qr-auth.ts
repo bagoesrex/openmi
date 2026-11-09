@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "crypto";
+import { logBroadcaster } from "../broadcaster";
 
 export interface QrSession {
   sessionId: string;
@@ -18,20 +19,31 @@ export interface QrPollResult {
   error?: string;
 }
 
+const IGNORED_COOKIE_ATTRS = new Set([
+  "path",
+  "domain",
+  "expires",
+  "max-age",
+  "samesite",
+  "secure",
+  "httponly",
+  "priority",
+  "version",
+]);
+
 export class SimpleCookieJar {
   private cookies = new Map<string, string>();
 
   public setCookies(setCookieHeaders: string[]): void {
     for (const header of setCookieHeaders) {
       if (!header) continue;
-      const part = header.split(";")[0]?.trim();
-      if (!part) continue;
-      const eqIdx = part.indexOf("=");
-      if (eqIdx > 0) {
-        const name = part.slice(0, eqIdx).trim();
-        const value = part.slice(eqIdx + 1).trim();
-        if (value) {
-          this.cookies.set(name, value);
+      // Match all key=value pairs, filtering out known Set-Cookie directives
+      const matches = header.matchAll(/([a-zA-Z0-9_\-\.]+)=([^;,\r\n]+)/g);
+      for (const match of matches) {
+        const key = match[1].trim();
+        const value = match[2].trim();
+        if (!IGNORED_COOKIE_ATTRS.has(key.toLowerCase()) && value) {
+          this.cookies.set(key, value);
         }
       }
     }
@@ -72,10 +84,12 @@ export interface InternalSession extends QrSession {
   cookieJar: SimpleCookieJar;
 }
 
-const SSO_LONGPOLLING_URL =
-  "https://account.xiaomi.com/longPolling/loginUrl?sid=18n_bbs_global&_json=false&callback=https://sgp-api.buy.mi.com/bbs/api/global/user/login-back";
-const SERVICELOGIN_URL = "https://account.xiaomi.com/pass/serviceLogin";
+const CALLBACK_URL = "https://sgp-api.buy.mi.com/bbs/api/global/user/login-back";
 const SID = "18n_bbs_global";
+const SSO_LONGPOLLING_URL = `https://account.xiaomi.com/longPolling/loginUrl?sid=${SID}&_json=false&callback=${encodeURIComponent(
+  CALLBACK_URL
+)}`;
+const SERVICELOGIN_URL = "https://account.xiaomi.com/pass/serviceLogin";
 const DEFAULT_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -247,6 +261,14 @@ export class QrAuthService {
 
   public async finalizeAuth(session: InternalSession, authData: any): Promise<void> {
     try {
+      console.log("[QR-Auth] Handshake approved. Starting finalizeAuth with data:", {
+        code: authData?.code,
+        userId: authData?.userId,
+        location: authData?.location,
+        hasNonce: !!authData?.nonce,
+        hasSsecurity: !!authData?.ssecurity,
+      });
+
       let nonce = authData?.nonce;
       let ssecurity = authData?.ssecurity;
       let location = authData?.location;
@@ -254,6 +276,7 @@ export class QrAuthService {
 
       // Fallback: if tokens are missing from longPolling payload, query serviceLogin
       if (!location || !nonce || !ssecurity) {
+        console.log("[QR-Auth] Missing location/nonce/ssecurity in authData. Querying serviceLogin fallback...");
         const serviceLoginUrl = `${SERVICELOGIN_URL}?sid=${SID}&_json=true`;
         const cookieHeader = session.cookieJar.getCookieHeader();
         const slRes = await fetch(serviceLoginUrl, {
@@ -271,14 +294,22 @@ export class QrAuthService {
           ssecurity = slJson.ssecurity || ssecurity;
           location = slJson.location || location;
           if (slJson.userId) userId = String(slJson.userId);
+          console.log("[QR-Auth] serviceLogin response:", {
+            code: slJson.code,
+            location: slJson.location,
+            hasNonce: !!slJson.nonce,
+            hasSsecurity: !!slJson.ssecurity,
+          });
         } catch {
           // ignore parsing error, proceed to check below
         }
       }
 
       if (!location || !nonce || !ssecurity) {
+        const errMsg = "Missing security tokens from Xiaomi response";
+        console.error(`[QR-Auth] Error: ${errMsg}`);
         session.status = "ERROR";
-        session.error = "Missing security tokens from Xiaomi response";
+        session.error = errMsg;
         return;
       }
 
@@ -288,10 +319,18 @@ export class QrAuthService {
       // Follow redirect chain, accumulating cookies at each hop until final destination
       const maxRedirects = 10;
       let redirectsCount = 0;
+      let lastStatus = 0;
+      let lastBody = "";
+
+      let extractedToken: string | undefined;
+      let extractedUserId: string | undefined = userId;
 
       while (redirectsCount < maxRedirects) {
         redirectsCount++;
         const cookieHeader = session.cookieJar.getCookieHeader();
+        console.log(`[QR-Auth] Hop ${redirectsCount}: GET ${currentUrl}`);
+        if (cookieHeader) console.log(`[QR-Auth] -> Sending Cookies: ${cookieHeader}`);
+
         const res = await fetch(currentUrl, {
           headers: {
             "User-Agent": DEFAULT_UA,
@@ -300,39 +339,135 @@ export class QrAuthService {
           redirect: "manual",
         });
 
-        session.cookieJar.setCookies(extractSetCookies(res));
+        lastStatus = res.status;
+        const setCookies = extractSetCookies(res);
+        if (setCookies.length > 0) {
+          session.cookieJar.setCookies(setCookies);
+          console.log(`[QR-Auth] Hop ${redirectsCount} Set-Cookie:`, setCookies);
+        }
 
+        console.log(`[QR-Auth] Hop ${redirectsCount} status: ${res.status}`);
+
+        // Check if token was set in cookies
+        extractedToken =
+          session.cookieJar.get("new_bbs_serviceToken") ||
+          session.cookieJar.get("serviceToken") ||
+          session.cookieJar.get("bbs_serviceToken");
+
+        extractedUserId =
+          session.cookieJar.get("cUserId") ||
+          session.cookieJar.get("userId") ||
+          extractedUserId;
+
+        // Follow 3xx redirects
         if (res.status >= 300 && res.status < 400) {
           const loc = res.headers.get("location");
+          console.log(`[QR-Auth] Hop ${redirectsCount} Location header: ${loc}`);
           if (!loc) break;
+
+          // Check if token was passed as a query param in redirect URL
+          try {
+            const u = new URL(loc, currentUrl);
+            const qToken =
+              u.searchParams.get("new_bbs_serviceToken") ||
+              u.searchParams.get("serviceToken") ||
+              u.searchParams.get("token");
+            if (qToken && !extractedToken) {
+              extractedToken = qToken;
+            }
+            const qUser = u.searchParams.get("cUserId") || u.searchParams.get("userId");
+            if (qUser && !extractedUserId) {
+              extractedUserId = qUser;
+            }
+          } catch {}
+
           currentUrl = new URL(loc, currentUrl).toString();
           continue;
         }
 
+        // Final non-redirect response: inspect body
+        lastBody = await res.text().catch(() => "");
+        console.log(`[QR-Auth] Final body preview: ${lastBody.slice(0, 300)}`);
+
+        // Check if token is in body JSON
+        try {
+          const bodyJson = JSON.parse(lastBody.startsWith("&&&START&&&") ? lastBody.slice(11) : lastBody);
+          const bToken =
+            bodyJson.data?.new_bbs_serviceToken ||
+            bodyJson.data?.serviceToken ||
+            bodyJson.new_bbs_serviceToken ||
+            bodyJson.serviceToken;
+          if (bToken && !extractedToken) {
+            extractedToken = bToken;
+          }
+          const bUser = bodyJson.data?.cUserId || bodyJson.data?.userId || bodyJson.userId;
+          if (bUser && !extractedUserId) {
+            extractedUserId = String(bUser);
+          }
+        } catch {}
+
         break;
       }
 
-      const extractedToken =
-        session.cookieJar.get("new_bbs_serviceToken") ||
-        session.cookieJar.get("serviceToken");
-
-      const extractedUserId =
-        session.cookieJar.get("cUserId") ||
-        session.cookieJar.get("userId") ||
-        userId;
+      // Final check of cookies
+      if (!extractedToken) {
+        extractedToken =
+          session.cookieJar.get("new_bbs_serviceToken") ||
+          session.cookieJar.get("serviceToken") ||
+          session.cookieJar.get("bbs_serviceToken");
+      }
 
       if (!extractedToken) {
+        const captured = session.cookieJar.toJSON();
+        const cookieNames = Object.keys(captured);
+        const errDetails = `Failed to extract serviceToken (hops: ${redirectsCount}, status: ${lastStatus}, cookies: [${cookieNames.join(
+          ", "
+        )}], body: ${lastBody.slice(0, 100) || "empty"})`;
+        console.error(`[QR-Auth] Error: ${errDetails}`);
         session.status = "ERROR";
-        session.error = "Failed to extract serviceToken from Xiaomi redirect cookies";
+        session.error = errDetails;
+
+        logBroadcaster.broadcast({
+          id: Date.now(),
+          timestamp: Date.now(),
+          action: "QR_AUTH_ERROR",
+          resultCode: lastStatus || 500,
+          message: errDetails,
+          rawPayload: JSON.stringify({ lastUrl: currentUrl, cookies: cookieNames }),
+          errorDetails: errDetails,
+        });
         return;
       }
 
       session.serviceToken = extractedToken;
       session.cUserId = extractedUserId || "";
       session.status = "SUCCESS";
+      console.log(`[QR-Auth] SUCCESS! Extracted token for cUserId: ${session.cUserId}`);
+
+      logBroadcaster.broadcast({
+        id: Date.now(),
+        timestamp: Date.now(),
+        action: "QR_AUTH_SUCCESS",
+        resultCode: 0,
+        message: `Xiaomi QR login authorized successfully for Account ID ${session.cUserId}`,
+        rawPayload: null,
+        errorDetails: null,
+      });
     } catch (err: any) {
+      const errMsg = `Failed to exchange authorization token: ${err.message}`;
+      console.error(`[QR-Auth] Exception: ${errMsg}`);
       session.status = "ERROR";
-      session.error = `Failed to exchange authorization token: ${err.message}`;
+      session.error = errMsg;
+
+      logBroadcaster.broadcast({
+        id: Date.now(),
+        timestamp: Date.now(),
+        action: "QR_AUTH_ERROR",
+        resultCode: 500,
+        message: errMsg,
+        rawPayload: null,
+        errorDetails: err.stack || errMsg,
+      });
     }
   }
 
