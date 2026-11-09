@@ -71,12 +71,18 @@ export async function checkUserState(
   options?: RequestOptions
 ): Promise<XiaomiApiResponse> {
   const url = buildXiaomiUrl(account.region, "user/bl-switch/state");
-  const headers = formatXiaomiHeaders(account.cUserId, account.serviceToken);
+  const deviceId = options?.deviceId || account.deviceId || undefined;
+  const headers = formatBurstHeaders(account.cUserId, account.serviceToken, deviceId);
+
+  const timeoutSignal = AbortSignal.timeout(options?.timeoutMs || 5000);
+  const signal = options?.signal
+    ? AbortSignal.any([options.signal, timeoutSignal])
+    : timeoutSignal;
 
   const fetchOptions: any = {
     method: "GET",
     headers,
-    signal: options?.signal || AbortSignal.timeout(options?.timeoutMs || 5000),
+    signal,
   };
 
   if (options?.proxy || account.proxyUrl) {
@@ -98,11 +104,16 @@ export async function applyBlAuth(
   const headers = formatBurstHeaders(account.cUserId, account.serviceToken, deviceId);
   const body = JSON.stringify({ is_retry: isRetry });
 
+  const timeoutSignal = AbortSignal.timeout(options?.timeoutMs || 5000);
+  const signal = options?.signal
+    ? AbortSignal.any([options.signal, timeoutSignal])
+    : timeoutSignal;
+
   const fetchOptions: any = {
     method: "POST",
     headers,
     body,
-    signal: options?.signal || AbortSignal.timeout(options?.timeoutMs || 5000),
+    signal,
   };
 
   if (options?.proxy || account.proxyUrl) {

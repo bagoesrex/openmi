@@ -48,6 +48,10 @@ export function calculateBurstSchedule(
   });
 }
 
+export function isBurstSuccess(evaluation: any, res: any): boolean {
+  return evaluation?.action === XiaomiStateAction.SUCCESS || res?.code === 100003;
+}
+
 export async function executeAccountBurst(
   account: Account,
   targetMidnightMs: number,
@@ -88,11 +92,7 @@ export async function executeAccountBurst(
           });
 
           const evaluation = handleApplyResult(res);
-
-          const isSuccess =
-            evaluation.action === XiaomiStateAction.SUCCESS ||
-            res.code === 0 ||
-            res.code === 100003;
+          const isSuccess = isBurstSuccess(evaluation, res);
 
           accountRepo.update(accountId, {
             lastApplyResult: evaluation.applyResult,
@@ -199,16 +199,18 @@ export function startScheduler(db: Database): SchedulerController {
         console.warn("[Scheduler] TLS pre-warm warning:", err);
       }
 
-      // T-5s: Quick session check
-      for (const acc of enabledAccounts) {
-        try {
-          const stateRes = await checkUserState(acc, { timeoutMs: 3000 });
-          if (stateRes.code !== 0) {
-            console.warn(`[Scheduler] Account "${acc.label}" cookie invalid before zero-hour!`);
-            accountRepo.update(acc.id, { sessionValid: 0 });
-          }
-        } catch {}
-      }
+      // T-5s: Quick session check in parallel across all accounts
+      await Promise.allSettled(
+        enabledAccounts.map(async (acc) => {
+          try {
+            const stateRes = await checkUserState(acc, { timeoutMs: 3000 });
+            if (stateRes.code !== 0) {
+              console.warn(`[Scheduler] Account "${acc.label}" cookie invalid before zero-hour!`);
+              accountRepo.update(acc.id, { sessionValid: 0 });
+            }
+          } catch {}
+        })
+      );
 
       // T-5s: Arm Spread-Burst waves across all enabled valid accounts
       const activeAccounts = accountRepo.getEnabled().filter((a) => a.sessionValid === 1);

@@ -53,4 +53,29 @@ describe("High-Precision Scheduler Timing", () => {
     expect(schedule[4].delayMs).toBe(4700); // 59.700 - 55.000 = 4700ms
     expect(schedule[5].delayMs).toBe(4900); // 59.900 - 55.000 = 4900ms
   });
+
+  it("evaluates burst shot success correctly without false positives on code 0 quota exhausted", () => {
+    const { isBurstSuccess } = require("../src/services/scheduler");
+    const { handleApplyResult } = require("../src/services/xiaomi/state-machine");
+
+    // Quota exhausted: code 0, apply_result 3 -> MUST NOT be success
+    const quotaExhaustedRes = { code: 0, data: { apply_result: 3 }, description: "Quota full" };
+    const evalExhausted = handleApplyResult(quotaExhaustedRes);
+    expect(isBurstSuccess(evalExhausted, quotaExhaustedRes)).toBe(false);
+
+    // Rate limited: code 0, apply_result 6 -> MUST NOT be success
+    const rateLimitRes = { code: 0, data: { apply_result: 6 }, description: "Rate limit" };
+    const evalRateLimit = handleApplyResult(rateLimitRes);
+    expect(isBurstSuccess(evalRateLimit, rateLimitRes)).toBe(false);
+
+    // Granted: code 0, apply_result 1 -> MUST BE success
+    const successRes = { code: 0, data: { apply_result: 1 }, description: "Granted" };
+    const evalSuccess = handleApplyResult(successRes);
+    expect(isBurstSuccess(evalSuccess, successRes)).toBe(true);
+
+    // Pre-authorized: code 100003 -> MUST BE success
+    const preAuthRes = { code: 100003, data: null, description: "Already authorized" };
+    const evalPreAuth = handleApplyResult(preAuthRes);
+    expect(isBurstSuccess(evalPreAuth, preAuthRes)).toBe(true);
+  });
 });
