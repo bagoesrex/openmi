@@ -5,6 +5,7 @@ import { authPlugin } from "./auth";
 import { checkUserState } from "../services/xiaomi/client";
 import { logBroadcaster } from "../services/broadcaster";
 import { qrAuthService } from "../services/xiaomi/qr-auth";
+import { resolveTimings, generateDeviceId } from "../services/xiaomi/burst";
 
 export function createAccountsApi(db: Database) {
   const accountRepo = createAccountRepo(db);
@@ -62,6 +63,8 @@ export function createAccountsApi(db: Database) {
                 deviceId: body.deviceId || null,
                 proxyUrl: body.proxyUrl || null,
                 autoApplyEnabled: body.autoApplyEnabled !== undefined ? (body.autoApplyEnabled ? 1 : 0) : 1,
+                timingMode: (body.timingMode as any) || "asia",
+                customTimings: body.customTimings || null,
               });
             },
             {
@@ -73,6 +76,8 @@ export function createAccountsApi(db: Database) {
                 deviceId: t.Optional(t.Nullable(t.String())),
                 proxyUrl: t.Optional(t.Nullable(t.String())),
                 autoApplyEnabled: t.Optional(t.Boolean()),
+                timingMode: t.Optional(t.String()),
+                customTimings: t.Optional(t.Nullable(t.String())),
               }),
             }
           )
@@ -87,6 +92,8 @@ export function createAccountsApi(db: Database) {
                 deviceId: body.deviceId,
                 proxyUrl: body.proxyUrl,
                 autoApplyEnabled: body.autoApplyEnabled !== undefined ? (body.autoApplyEnabled ? 1 : 0) : undefined,
+                timingMode: body.timingMode as any,
+                customTimings: body.customTimings,
               });
               if (!updated) {
                 set.status = 404;
@@ -103,6 +110,8 @@ export function createAccountsApi(db: Database) {
                 deviceId: t.Optional(t.Nullable(t.String())),
                 proxyUrl: t.Optional(t.Nullable(t.String())),
                 autoApplyEnabled: t.Optional(t.Boolean()),
+                timingMode: t.Optional(t.String()),
+                customTimings: t.Optional(t.Nullable(t.String())),
               }),
             }
           )
@@ -173,6 +182,59 @@ export function createAccountsApi(db: Database) {
               set.status = 502;
               return { error: errorMsg };
             }
+          })
+          .post("/api/accounts/:id/test-burst", async ({ params: { id }, set }) => {
+            const acc = accountRepo.getById(id);
+            if (!acc) {
+              set.status = 404;
+              return { error: "Account not found" };
+            }
+
+            const timings = resolveTimings(acc.timingMode, acc.customTimings);
+            const simulatedShots = timings.slice(0, 3);
+            const results: any[] = [];
+
+            for (let i = 0; i < simulatedShots.length; i++) {
+              const shotDevId = generateDeviceId();
+              const startTime = Date.now();
+              try {
+                const res = await checkUserState(acc, { timeoutMs: 3000, deviceId: shotDevId });
+                const duration = Date.now() - startTime;
+                results.push({
+                  shot: i + 1,
+                  offset: simulatedShots[i],
+                  deviceId: shotDevId.slice(0, 8),
+                  duration,
+                  status: res.code === 0 ? "OK" : `ERR_${res.code}`,
+                });
+              } catch (err: any) {
+                results.push({
+                  shot: i + 1,
+                  offset: simulatedShots[i],
+                  deviceId: shotDevId.slice(0, 8),
+                  error: err.message,
+                });
+              }
+            }
+
+            const logEntry = {
+              accountId: acc.id,
+              timestamp: Date.now(),
+              action: "BURST_TEST",
+              resultCode: 0,
+              message: `Simulated ${results.length} burst wave shots for profile "${acc.timingMode}". Latency: ${results.map(r => `${r.duration || 0}ms`).join(", ")}`,
+              rawPayload: JSON.stringify(results),
+              errorDetails: null,
+            };
+            logRepo.insert(logEntry);
+            logBroadcaster.broadcast({ ...logEntry, id: Date.now() });
+
+            return {
+              success: true,
+              profile: acc.timingMode,
+              timings,
+              simulatedShots: results,
+            };
           })
     );
 }

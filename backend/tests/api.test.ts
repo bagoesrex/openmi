@@ -72,6 +72,19 @@ describe("Elysia REST API", () => {
     const created = await createRes.json();
     expect(created.id).toBeDefined();
     expect(created.label).toBe("API Account");
+    expect(created.timingMode).toBe("asia");
+
+    // Test burst dry-run endpoint: POST /api/accounts/:id/test-burst
+    const testBurstRes = await app.handle(
+      new Request(`http://localhost/api/accounts/${created.id}/test-burst`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${json.token}` },
+      })
+    );
+    expect(testBurstRes.status).toBe(200);
+    const burstData = await testBurstRes.json();
+    expect(burstData.success).toBe(true);
+    expect(burstData.profile).toBe("asia");
 
     // Fetch accounts again
     const accListRes = await app.handle(
