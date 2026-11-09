@@ -44,6 +44,23 @@ describe("Database & Repositories", () => {
     expect(accountRepo.getById(acc.id)).toBeNull();
   });
 
+  it("supports timingMode and customTimings persistence", () => {
+    const acc = accountRepo.create({
+      label: "Burst Account",
+      cUserId: "112233",
+      serviceToken: "tok",
+      timingMode: "asia",
+      customTimings: "[58.8, 59.1]",
+    });
+    expect(acc.timingMode).toBe("asia");
+    expect(acc.customTimings).toBe("[58.8, 59.1]");
+
+    accountRepo.update(acc.id, { timingMode: "custom", customTimings: "[58.5, 59.0]" });
+    const updated = accountRepo.getById(acc.id);
+    expect(updated?.timingMode).toBe("custom");
+    expect(updated?.customTimings).toBe("[58.5, 59.0]");
+  });
+
   it("should write and fetch execution logs with diagnostic metadata", () => {
     // Create an account first to satisfy foreign key constraint
     const acc = accountRepo.create({

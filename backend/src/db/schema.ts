@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   last_button_state INTEGER,
   last_apply_result INTEGER,
   auto_apply_enabled INTEGER DEFAULT 1,
+  timing_mode TEXT DEFAULT 'asia',
+  custom_timings TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );

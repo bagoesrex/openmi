@@ -1,3 +1,5 @@
+import { TimingMode } from "../services/xiaomi/burst";
+
 export interface Account {
   id: string;
   label: string;
@@ -10,6 +12,8 @@ export interface Account {
   lastButtonState?: number | null;
   lastApplyResult?: number | null;
   autoApplyEnabled: number; // 1 = true, 0 = false
+  timingMode: TimingMode;
+  customTimings?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -22,4 +26,6 @@ export interface NewAccount {
   deviceId?: string | null;
   proxyUrl?: string | null;
   autoApplyEnabled?: number;
+  timingMode?: TimingMode;
+  customTimings?: string | null;
 }

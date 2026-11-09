@@ -32,6 +32,8 @@ function mapRowToAccount(row: any): Account {
     lastButtonState: row.last_button_state,
     lastApplyResult: row.last_apply_result,
     autoApplyEnabled: row.auto_apply_enabled,
+    timingMode: (row.timing_mode as any) || "asia",
+    customTimings: row.custom_timings || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -55,8 +57,8 @@ export function createAccountRepo(db: Database): AccountRepository {
   const selectByIdStmt = db.prepare("SELECT * FROM accounts WHERE id = ?");
   const selectEnabledStmt = db.prepare("SELECT * FROM accounts WHERE auto_apply_enabled = 1");
   const insertStmt = db.prepare(`
-    INSERT INTO accounts (id, label, region, c_user_id, service_token, device_id, proxy_url, auto_apply_enabled)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO accounts (id, label, region, c_user_id, service_token, device_id, proxy_url, auto_apply_enabled, timing_mode, custom_timings)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const deleteStmt = db.prepare("DELETE FROM accounts WHERE id = ?");
 
@@ -75,6 +77,8 @@ export function createAccountRepo(db: Database): AccountRepository {
       const id = crypto.randomUUID();
       const region = data.region || "global";
       const autoApply = data.autoApplyEnabled !== undefined ? data.autoApplyEnabled : 1;
+      const timingMode = data.timingMode || "asia";
+      const customTimings = data.customTimings || null;
       insertStmt.run(
         id,
         data.label,
@@ -83,7 +87,9 @@ export function createAccountRepo(db: Database): AccountRepository {
         data.serviceToken,
         data.deviceId || null,
         data.proxyUrl || null,
-        autoApply
+        autoApply,
+        timingMode,
+        customTimings
       );
       return selectByIdStmt.get(id) as unknown as Account && mapRowToAccount(selectByIdStmt.get(id));
     },
@@ -104,6 +110,8 @@ export function createAccountRepo(db: Database): AccountRepository {
       if (data.lastButtonState !== undefined) { fields.push("last_button_state = ?"); values.push(data.lastButtonState); }
       if (data.lastApplyResult !== undefined) { fields.push("last_apply_result = ?"); values.push(data.lastApplyResult); }
       if (data.autoApplyEnabled !== undefined) { fields.push("auto_apply_enabled = ?"); values.push(data.autoApplyEnabled); }
+      if (data.timingMode !== undefined) { fields.push("timing_mode = ?"); values.push(data.timingMode); }
+      if (data.customTimings !== undefined) { fields.push("custom_timings = ?"); values.push(data.customTimings); }
 
       fields.push("updated_at = CURRENT_TIMESTAMP");
       values.push(id);
