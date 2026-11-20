@@ -35,10 +35,11 @@ Cookie: cUserId=<cUserId>; serviceToken=<token>; new_bbs_serviceToken=<token>
 ### Aturan Header Cookie:
 1. **Dual-Token**: Backend Xiaomi memeriksa keberadaan `serviceToken` dan `new_bbs_serviceToken`. Keduanya harus diisi dengan nilai token otorisasi yang sama.
 2. **URL-Encoding**: Karakter `+` pada string token wajib di-encode menjadi `%2B` agar tidak diinterpretasikan sebagai spasi oleh server.
+3. **Rotasi Device ID Dinamis**: Pada mode *Spread-Burst*, OpenMi secara dinamis menginjeksi parameter `deviceId` berupa hash SHA-1 (40 karakter huruf kapital) berbeda untuk setiap gelombang tembakan guna menghindari throttling berbasis reputasi perangkat.
 
 ---
 
-## 3. Daftar Endpoint
+## 3. Daftar Endpoint Xiaomi Resmi
 
 ### 3.1. Cek Global Feature Switch
 Memeriksa apakah fitur permohonan bootloader unlock sedang aktif secara global oleh Xiaomi.
@@ -144,8 +145,11 @@ State machine engine OpenMi memetakan seluruh 7 kode status hasil dekompilasi AP
 
 ## 5. Alur Eksekusi Zero-Hour di OpenMi
 
+OpenMi mendukung dua strategi eksekusi:
+
+### 5.1. Single-Target Zero-Hour Execution
 ```
-[T-10s] 22:59:50 WIB ──> TLS Pre-warming: Buka socket keep-alive ke sgp-api.buy.mi.com
+[T-15s] 22:59:45 WIB ──> TLS Pre-warming: Buka socket keep-alive ke sgp-api.buy.mi.com
 [T-5s]  22:59:55 WIB ──> Pre-check: GET user/bl-switch/state (validasi sesi akun)
 [T-0s]  23:00:00.000 WIB ──> Zero-Hour Apply: POST apply/bl-auth {"is_retry": false}
                           │
@@ -155,3 +159,38 @@ State machine engine OpenMi memetakan seluruh 7 kode status hasil dekompilasi AP
                           ├─ Code 6 ────> Tunggu 60s, lalu retry 1x
                           └─ Code 2/4 ──> Cooldown perangkat (Selesai)
 ```
+
+### 5.2. Spread-Burst Multi-Wave Execution
+Menembakkan gelombang request paralel terkalibrasi menggunakan Device ID acak:
+* **Asia Profile**: Tembakan pada detik `[58.8, 59.1, 59.3, 59.5, 59.7]` di menit 59.
+* **Global Profile**: Tembakan pada detik `[59.0, 59.3, 59.6, 59.8]` di menit 59.
+* **Custom Profile**: Offset detik kustom yang dikonfigurasi per akun.
+
+---
+
+## 6. OpenMi Internal Management API Reference (Elysia Backend)
+
+Semua endpoint internal diproteksi oleh Authorization header: `Bearer <JWT_TOKEN>` (didapat dari `POST /api/auth/login`).
+
+### Autentikasi
+* `POST /api/auth/login`: Menerima `{ "password": "<MASTER_PASSWORD>" }`. Mengembalikan `{ "token": "<JWT>" }`.
+* `GET /api/auth/verify`: Memverifikasi validitas token JWT saat ini.
+
+### Manajemen Akun & Eksekusi
+* `GET /api/accounts`: Mendapatkan daftar seluruh akun terdaftar.
+* `POST /api/accounts`: Mendaftarkan akun baru (`label`, `region`, `cUserId`, `serviceToken`, `proxyUrl`, `autoApplyEnabled`, `timingMode`, `customTimings`).
+* `GET /api/accounts/:id`: Mengambil detail spesifik satu akun.
+* `PUT /api/accounts/:id`: Memperbarui data akun.
+* `DELETE /api/accounts/:id`: Menghapus akun dari SQLite database.
+* `POST /api/accounts/:id/test`: Menguji validitas cookie akun ke server Xiaomi (`checkUserState`).
+* `POST /api/accounts/:id/test-burst`: Menjalankan simulasi dry-run gelombang timing mode akun dan mengembalikan latency per tembakan.
+
+### Autentikasi QR Code Headless (SSO Xiaomi)
+* `POST /api/accounts/qr/session`: Membuat sesi QR baru ke Xiaomi SSO, mengembalikan `{ sessionId, qrUrl, timeout }`.
+* `GET /api/accounts/qr/session/:sessionId/status`: Memeriksa status long-polling (`WAITING`, `SCANNED`, `SUCCESS`, `EXPIRED`, `ERROR`).
+* `DELETE /api/accounts/qr/session/:sessionId`: Membatalkan sesi polling QR yang sedang aktif.
+
+### Telemetri Log & Pembersihan Permanen
+* `GET /api/logs`: Mengambil riwayat log eksekusi terbaru dari SQLite (maksimal 100 entri).
+* `DELETE /api/logs`: Menghapus riwayat log secara permanen dari database SQLite dan menyiarkan pembaruan via SSE.
+* `GET /api/logs/stream?token=<JWT>`: Endpoint Server-Sent Events (SSE) untuk streaming log eksekusi secara real-time ke web dashboard.

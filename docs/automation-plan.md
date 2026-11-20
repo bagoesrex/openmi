@@ -56,11 +56,18 @@ Untuk memastikan request mendarat di server Xiaomi pada detik pertama kuota dibu
 
 | Titik Waktu | Nama Tahapan | Aksi Teknis |
 |---|---|---|
-| **Berkala (Tiap Jam)** | **NTP Clock Sync** | Menghubungi edge trace time service untuk mengkalibrasi offset jam lokal VPS (toleransi drift < 10ms). |
-| **T-10 Detik (22:59:50 WIB)** | **TLS Pre-warming** | Membuka koneksi TCP + TLS handshake awal ke `https://sgp-api.buy.mi.com` agar saat jam 23:00 tidak ada latensi DNS lookup atau handshake TLS. |
+| **Berkala (Tiap Jam)** | **NTP Clock Sync** | Menghubungi edge trace time service (Cloudflare) untuk mengkalibrasi offset jam lokal VPS (toleransi drift < 10ms). |
+| **T-15s & T-10s (22:59:45 - 22:59:50 WIB)** | **TLS Pre-warming** | Membuka koneksi TCP + TLS handshake awal ke `https://sgp-api.buy.mi.com` agar saat mendekati jam 23:00 tidak ada latensi DNS lookup atau handshake TLS. |
 | **T-5 Detik (22:59:55 WIB)** | **Pre-flight Healthcheck** | Memanggil `GET user/bl-switch/state` untuk memverifikasi validitas sesi cookie semua akun aktif. |
-| **T-0 Detik (23:00:00.000 WIB)** | **Zero-Hour Fire** | Mengirimkan request paralel `POST apply/bl-auth` (`{"is_retry": false}`) secara instan untuk seluruh akun yang diaktifkan (`auto_apply_enabled: 1`). |
-| **T+0.2s s.d. T+3s** | **State Machine Processing** | Menganalisis kode hasil. Jika menerima kode 5 (*Transient failure*) atau kode 7 (*Server busy*), scheduler otomatis menembak retry `{"is_retry": true}` dalam rentang 300ms. |
+| **T-1.2s s.d. T-0s** | **Burst Wave Fire** | Untuk akun bertipe *Spread-Burst*, thread mengeksekusi gelombang tembakan terkalibrasi (`asia`, `global`, atau `custom`) dengan `deviceId` dinamis berbeda di setiap gelombang. |
+| **T-0 Detik (23:00:00.000 WIB)** | **Zero-Hour Fire** | Mengirimkan request puncak `POST apply/bl-auth` (`{"is_retry": false}`) secara instan untuk seluruh akun yang diaktifkan (`auto_apply_enabled: 1`). |
+| **T+0.2s s.d. T+3s** | **State Machine Processing** | Menganalisis kode hasil. Jika menerima kode 5 (*Transient failure*) atau kode 7 (*Server busy*), scheduler otomatis menembak retry `{"is_retry": true}` dalam rentang 300ms. Jika sukses (kode 1) atau kuota habis (kode 3), eksekusi malam itu selesai. |
+
+### 3.1. Profil Timing Spread-Burst
+* **`asia`**: Gelombang tembakan pada detik `[58.8, 59.1, 59.3, 59.5, 59.7]` (menit ke-59).
+* **`global`**: Gelombang tembakan pada detik `[59.0, 59.3, 59.6, 59.8]`.
+* **`custom`**: Nilai offset kustom per akun yang dapat disesuaikan dengan latensi jaringan VPS masing-masing.
+* **Simulasi Latensi**: Melalui tombol **Test Burst** di dashboard (`POST /api/accounts/:id/test-burst`), pengguna dapat melakukan *dry-run* simulasi 3 gelombang tembakan ke server Xiaomi untuk memverifikasi kesiapan jaringan dan waktu respons.
 
 ---
 
@@ -68,8 +75,8 @@ Untuk memastikan request mendarat di server Xiaomi pada detik pertama kuota dibu
 
 Setiap aktivitas, pengujian, maupun eksekusi permohonan kuota dicatat ke database SQLite `openmi.sqlite` dan disiarkan langsung melalui Server-Sent Events (SSE) dengan metadata lengkap:
 * `timestamp`: Unix timestamp milidetik.
-* `action`: Jenis aksi (`CHECK_STATE`, `APPLY_AUTH`, `PRE_WARM`).
+* `action`: Jenis aksi (`CHECK_STATE`, `APPLY_AUTH`, `PRE_WARM`, `BURST_TEST`, `QR_AUTH_SUCCESS`, `QR_AUTH_ERROR`).
 * `result_code`: Kode integer respons Xiaomi (`0`, `1`, `2`, `3`, `5`, `6`, `7`, `100004`).
 * `raw_payload`: Body JSON mentah dari server Xiaomi.
 * `error_details`: Catatan analisis teknis yang dapat dibaca manusia maupun AI coding agent untuk troubleshooting.
-* `clear_logs`: Dukungan endpoint `DELETE /api/logs` untuk mengosongkan riwayat log secara permanen di database.
+* `clear_logs`: Dukungan endpoint `DELETE /api/logs` untuk mengosongkan riwayat log secara permanen di database SQLite (tetap kosong bahkan setelah refresh browser F5).

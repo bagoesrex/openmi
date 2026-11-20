@@ -100,12 +100,22 @@ The quota reset time is **00:00:00 GMT+8 (Beijing Time)**, which is exactly **23
 
 ## 4. Execution Timing Strategy
 
-The VPS backend execution engine follows this timing lifecycle:
-1. **Continuous**: Periodic NTP synchronization (`pool.ntp.org` / edge trace) to calibrate local system clock drift to ±10ms.
-2. **T-10s (22:59:50 WIB)**: Pre-warm TLS connection (open socket to `sgp-api.buy.mi.com`) to eliminate DNS + TLS handshake latency at zero-hour.
+The VPS backend execution engine supports two timing modes:
+
+### Single-Target Zero-Hour Execution
+1. **Continuous**: Periodic NTP synchronization (`pool.ntp.org` / Cloudflare trace) to calibrate local system clock drift to ±10ms.
+2. **T-15s to T-10s (22:59:45 - 22:59:50 WIB)**: Pre-warm TLS connection (open socket to `sgp-api.buy.mi.com`) to eliminate DNS + TLS handshake latency at zero-hour.
 3. **T-5s (22:59:55 WIB)**: Pre-check `GET user/bl-switch/state` to confirm session validity.
 4. **T-0s (23:00:00.000 WIB)**: Fire primary `POST apply/bl-auth` (`is_retry: false`).
 5. **T+0s to T+3s**: State machine handles response. If code 5 or 7, fire retry (`is_retry: true`). If code 1, 2, 3, or 4, conclude execution immediately.
+
+### Spread-Burst Multi-Wave Execution
+Accounts can be configured with specific timing profiles:
+- **`asia`**: `[58.8, 59.1, 59.3, 59.5, 59.7]` (seconds into minute 59).
+- **`global`**: `[59.0, 59.3, 59.6, 59.8]`.
+- **`custom`**: User-defined comma-separated list of float second offsets.
+- **Dynamic Device ID**: Each shot generates an ephemeral 40-character uppercase hexadecimal SHA-1 string (`deviceId`) to prevent account or IP reputation throttling.
+- **Dry-Run Simulation**: `POST /api/accounts/:id/test-burst` simulates the wave sequence against `checkUserState` to measure live latency.
 
 ---
 
@@ -152,3 +162,5 @@ All commits in this repository MUST follow the Conventional Commits specificatio
 - [x] **Milestone 8**: Interactive browser session capture tool (`bun run capture`)
 - [x] **Milestone 9**: Full-stack Playwright automated test runner (`bun run test:e2e`)
 - [x] **Milestone 10**: Permanent SQLite log clearing (`DELETE /api/logs`)
+- [x] **Milestone 11**: Spread-burst execution engine with timing profiles (`asia`, `global`, `custom`), dynamic `deviceId` rotation, and dry-run test API (`POST /api/accounts/:id/test-burst`)
+- [x] **Milestone 12**: Headless Xiaomi SSO QR Code authentication (`POST /api/accounts/qr/session`), `SimpleCookieJar` redirect chain resolution, error state rendering, and real-time telemetries

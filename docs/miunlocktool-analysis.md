@@ -113,25 +113,24 @@ Aplikasi Android `miunlocktool` menyertakan modul protokol resmi **Mi Unlock Too
 | **Dukungan Multi-Akun** | ❌ 1 Akun per sesi aplikasi |  **Multi-Akun Paralel** (manajemen UID, kuota, proxy per akun) |
 | **Ketergantungan Perangkat** | Komputer / HP harus menyala aktif saat jam 23:00 WIB |  **Berjalan 24/7 di Cloud VPS** tanpa perlu menyalakan PC/HP |
 | **Sinkronisasi Waktu** | NTP UDP socket (Google, Cloudflare, stratum) | NTP edge trace sub-detik terkalibrasi ke jam VPS |
-| **Optimasi Jaringan** | Ping compensation trigger (`60 - ping`) | **TLS Socket Pre-warming T-10s** (0 handshake latency) |
-| **Metode Eksekusi** | *Spread-burst* (5-6 request per akun dalam 1 detik) | **Zero-Hour Fire (1 on-time)** + Smart State-Machine Retry |
-| **Resiko Rate-Limit (Code 6)**| Lebih tinggi jika server Xiaomi mendeteksi burst IP |  Rendah (mengikuti protokol resmi `is_retry`) |
-| **Manajemen Cookie** | QR Code SSO Login & Chromium Cookie Parser | Playwright Browser Capture (`bun run capture`) & Web Form |
+| **Optimasi Jaringan** | Ping compensation trigger (`60 - ping`) | **TLS Socket Pre-warming T-15s & T-10s** (0 handshake latency) |
+| **Metode Eksekusi** | *Spread-burst* (5-6 request per akun dalam 1 detik) | **Zero-Hour Single-Shot & Spread-Burst Profiles** (Asia, Global, Custom) |
+| **Resiko Rate-Limit (Code 6)**| Lebih tinggi jika server Xiaomi mendeteksi burst IP | Terkendali (rotasi dinamis `deviceId` 40-karakter SHA-1 per gelombang) |
+| **Manajemen Cookie** | QR Code SSO Login & Chromium Cookie Parser | **Headless QR Code SSO di Dashboard** + Browser Capture + Web Form |
 | **Observabilitas / Log** | Textbox GUI lokal | **Real-time Server-Sent Events (SSE)** + SQLite Persistent Log |
-| **Fitur Ekstra** | HyperOS 1 bypass & USB-OTG Fastboot flasher | Auto-normalizer Base64 URL token, Multi-region routing |
+| **Fitur Ekstra** | HyperOS 1 bypass & USB-OTG Fastboot flasher | Auto-normalizer Base64 URL token, Dry-Run Burst Test, Multi-region routing |
 
 ---
 
-## 4. Wawasan Berharga & Rencana Adopsi untuk OpenMi
+## 4. Status Adopsi Teknik Unggulan ke OpenMi (100% Selesai)
 
-Dari analisis terhadap `miunlocktool`, terdapat beberapa teknik berharga yang sangat potensial untuk diadopsi ke dalam OpenMi di masa depan:
+Berdasarkan hasil analisis terhadap `miunlocktool`, seluruh teknik kunci yang relevan telah berhasil diadopsi dan diimplementasikan ke dalam OpenMi:
 
-1. **Adopsi Parameter Cookie Lengkap (`versionCode`, `versionName`, `deviceId`)**:
-   * Menambahkan `versionCode=500440; versionName=5.4.40; deviceId={randomSha1};` ke dalam cookie header default OpenMi di `backend/src/services/xiaomi/client.ts` untuk meningkatkan kemiripan request dengan aplikasi resmi Xiaomi Community.
-2. **Fitur Generator QR Code Login Langsung di Dashboard**:
-   * Alur login QR Code pada `xiaomi_auth.py` (`LONGPOLLING_URL` dengan `sid=18n_bbs_global`) dapat diimplementasikan sebagai endpoint REST di backend OpenMi (`POST /api/auth/xiaomi/qr`).
-   * Pengguna dashboard cukup memindai QR Code dari layar browser dashboard OpenMi menggunakan HP mereka, lalu token otomatis tersimpan ke akun tanpa perlu membuka DevTools atau menjalankan skrip Playwright capture.
-3. **Pilihan Strategi Eksekusi Opsional**:
-   * Memberikan opsi mode tembak di dashboard:
-     * *Mode Presisi Konservatif (Default OpenMi)*: 1 request on-time + retry otomatis jika gagal.
-     * *Mode Spread Burst*: Mengirimkan 3-5 request dengan micro-offset (misal -300ms, -150ms, 0ms, +150ms) menggunakan device ID acak.
+1. **Rotasi Parameter Dinamis (`deviceId`, `versionCode`, `versionName`) — ✅ Selesai**:
+   * OpenMi menginjeksi header identitas resmi aplikasi Xiaomi Community (`v5.4.40`) dan secara dinamis membangkitkan `deviceId` acak (hash SHA-1 40-karakter huruf kapital) per tembakan request di `client.ts` dan `burst.ts`.
+2. **Fitur Generator QR Code Login Langsung di Dashboard — ✅ Selesai**:
+   * Modul otentikasi headless Xiaomi SSO terintegrasi penuh melalui endpoint `POST /api/accounts/qr/session` dan `qr-auth.ts`.
+   * Dashboard web menyediakan modal QR scan interaktif dengan auto-polling, resolusi redirect berantai (`SimpleCookieJar`), ekstraksi `new_bbs_serviceToken` / `cUserId`, serta telemetri status real-time (`QR_AUTH_SUCCESS` / `QR_AUTH_ERROR`).
+3. **Pilihan Strategi Eksekusi Spread-Burst — ✅ Selesai**:
+   * Pengguna dapat memilih mode eksekusi pada setiap akun: *Asia Burst* (`58.8s`, `59.1s`, `59.3s`, `59.5s`, `59.7s`), *Global Burst* (`59.0s`, `59.3s`, `59.6s`, `59.8s`), atau *Custom Timings*.
+   * Tersedia fitur **Test Burst** (`POST /api/accounts/:id/test-burst`) di dashboard untuk menguji latensi dan urutan tembakan secara nyata (*dry-run*) sebelum eksekusi tengah malam.

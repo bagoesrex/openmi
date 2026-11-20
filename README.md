@@ -28,31 +28,40 @@ Pengguna dapat memeriksa versi terkini aplikasi Xiaomi Community melalui tautan 
 
 ## Fitur Utama
 
-1. **Multi-Account Management**: Kelola banyak akun Xiaomi sekaligus (Label, Region `global`/`id`, `cUserId`, `serviceToken`, dan opsi outbound Proxy).
-2. **Direct REST API Engine**: Terhubung langsung ke host backend resmi Xiaomi (`https://sgp-api.buy.mi.com/bbs/api/{region}/`) tanpa overhead rendering HTML/WebView.
-3. **High-Precision Scheduler**: Berjalan 24/7 di VPS, tersinkronisasi sub-detik dengan NTP edge trace, melakukan TLS pre-warming pada T-10 detik, verifikasi sesi pada T-5 detik, dan eksekusi request concurrent tepat pada **23:00:00 WIB** (**00:00:00 GMT+8 Beijing Time**).
-4. **State Machine 7 Kode Respons**: Menangani seluruh 7 kode hasil resmi (`applyResult`) dari dekompilasi aplikasi Xiaomi Community (termasuk auto-retry pintar untuk kode 5 dan 7, serta cooldown 60 detik untuk kode 6).
-5. **Interactive Cookie Capture Tool**: Skrip berbasis Playwright yang membuka browser Google Chrome asli dengan sesi persisten untuk menangkap cookie otentikasi secara instan dan aman.
-6. **Rich Diagnostic Error Logging & Permanent Clear**: Setiap aktivitas dan error dicatat terstruktur (timestamp ms, endpoint, HTTP status, kode Xiaomi, raw body, dan saran diagnostik AI). Riwayat log dapat dihapus permanen dari SQLite melalui tombol Clear.
-7. **Real-time Live Stream Console**: Log eksekusi disiarkan detik demi detik ke dashboard web via Server-Sent Events (SSE) dengan indikator status koneksi (Live Sync).
-8. **Single-Tenant Security**: Seluruh akses diproteksi dengan `MASTER_PASSWORD` di `.env` yang menerbitkan JSON Web Token (JWT).
+1. **Multi-Account Management**: Kelola banyak akun Xiaomi sekaligus (Label, Region `global`/`id`, `cUserId`, `serviceToken`, pilihan Timing Mode, dan opsi outbound HTTP/SOCKS5 Proxy).
+2. **Headless QR Code SSO Login**: Pindai QR code langsung dari modal dashboard web menggunakan aplikasi Akun Xiaomi / Kamera ponsel. OpenMi secara otomatis melakukan long-polling, mengikuti redirect otentikasi STS Xiaomi, mengumpulkan session cookie (`SimpleCookieJar`), dan mengekstrak `serviceToken` serta `cUserId` tanpa perlu membuka browser luar atau memasang ekstensi.
+3. **Spread-Burst Execution Engine**: Mendukung profil penembakan gelombang kuota (*Asia*, *Global*, dan *Custom Timings* berpresisi tinggi). Setiap tembakan dalam gelombang menggunakan `deviceId` acak (SHA-1 40-karakter) guna memaksimalkan probabilitas memperoleh kuota resmi tanpa risiko terblokir reputasi perangkat tunggal.
+4. **Dry-Run Burst Simulation**: Uji kelayakan dan ukur latensi riil koneksi VPS ke server Xiaomi untuk setiap gelombang tembakan (`POST /api/accounts/:id/test-burst`) langsung dari kartu akun di dashboard.
+5. **Direct REST API Engine**: Terhubung langsung ke host backend resmi Xiaomi (`https://sgp-api.buy.mi.com/bbs/api/{region}/`) tanpa overhead rendering HTML/WebView.
+6. **High-Precision Scheduler & NTP Sync**: Berjalan 24/7 di VPS, tersinkronisasi sub-detik dengan NTP edge trace (Cloudflare drift < 10ms), melakukan TLS pre-warming pada T-15s dan T-10s, verifikasi sesi akun pada T-5s, dan mengeksekusi request tepat menyongsong pukul **23:00:00 WIB** (**00:00:00 GMT+8 Beijing Time**).
+7. **State Machine 7 Kode Respons**: Menangani seluruh 7 kode hasil resmi (`applyResult`) dari dekompilasi aplikasi Xiaomi Community (termasuk auto-retry pintar untuk kode 5 dan 7, serta cooldown 60 detik untuk kode 6).
+8. **Interactive Cookie Capture Tool**: Skrip pendamping berbasis Playwright (`bun run capture`) yang membuka browser Google Chrome asli dengan sesi persisten sebagai alternatif ekstraksi kredensial.
+9. **Rich Diagnostic Error Logging & Permanent Clear**: Setiap aktivitas dan error dicatat terstruktur (timestamp ms, endpoint, HTTP status, kode Xiaomi, raw body, dan saran diagnostik AI). Riwayat log tersimpan di database SQLite dan dapat dihapus permanen melalui tombol **Clear**.
+10. **Real-time Live Stream Console**: Log eksekusi dan progres otentikasi disiarkan detik demi detik ke dashboard web via Server-Sent Events (SSE) dengan indikator status koneksi (Live Sync).
+11. **Single-Tenant Security**: Seluruh akses API diproteksi dengan `MASTER_PASSWORD` di `.env` yang menerbitkan JSON Web Token (JWT).
 
 ---
 
-## Autentikasi dan Ekstraksi Cookie
+## Autentikasi dan Ekstraksi Kredensial
 
-OpenMi menggunakan session cookie (`cUserId` dan `serviceToken`) dari akun Xiaomi yang sudah login resmi. Hal ini dilakukan untuk menghindari sistem anti-fraud captcha (Geetest) dan OTP SMS yang diterapkan Xiaomi pada endpoint login langsung.
+OpenMi mendukung beberapa cara mudah untuk mengotorisasi akun Xiaomi:
 
-Sistem OpenMi secara otomatis menangani kebutuhan dual-token (`serviceToken` + `new_bbs_serviceToken`) dan URL-encoding karakter Base64.
+### Cara 1: Scan QR Code Langsung di Dashboard (Paling Praktis & Direkomendasikan)
+1. Buka dashboard OpenMi dan klik tombol **+ Add Account**.
+2. Pada tab default **Scan QR Login**, kode QR SSO Xiaomi resmi akan dimuat secara instan.
+3. Buka aplikasi **Akun Xiaomi** (atau gunakan kamera / scanner HP Xiaomi) dan pindai kode QR.
+4. Klik **Setujui / Authorize** di ponsel Anda.
+5. OpenMi secara otomatis menangkap token, mengisi kolom `cUserId` dan `serviceToken`, serta memberikan label akun otomatis. Klik **Save Account**.
 
-### Cara Cepat Menangkap Cookie (Otomatis):
+### Cara 2: Interactive Browser Capture (Otomatis via PC)
 ```bash
 cd backend
 bun run capture
 ```
 Browser Google Chrome akan terbuka secara otomatis. Setelah Anda login sekali, skrip akan langsung mendeteksi sesi, memicu pertukaran token, menyimpan kredensial ke `captured-cookies.json`, dan menguji kelayakannya ke server Xiaomi.
 
-Panduan langkah demi langkah selengkapnya (termasuk metode manual DevTools dan Android packet sniffing) tersedia di:
+### Cara 3: Manual Input (DevTools Browser / Sniffer Android)
+Panduan manual selengkapnya tersedia di:
 - **[Panduan Ekstraksi Kredensial Xiaomi](docs/auth-guide.md)**
 
 ---
@@ -64,25 +73,29 @@ openmi/
 ├── backend/                       # VPS Daemon Service
 │   ├── src/
 │   │   ├── domain/                # Clean Architecture Entities (Account, Log)
-│   │   ├── db/                    # bun:sqlite schema, client, & repositories
+│   │   ├── db/                    # bun:sqlite schema, client, migrations, & repositories
 │   │   ├── services/
-│   │   │   ├── xiaomi/            # REST Client (sgp-api), normalizer & 7-code state machine
+│   │   │   ├── xiaomi/            # REST Client (sgp-api), burst wave, qr-auth, & state machine
+│   │   │   │   ├── client.ts      # HTTP wrapper with dual-token & dynamic deviceId
+│   │   │   │   ├── state-machine.ts # 7-code result evaluator
+│   │   │   │   ├── burst.ts       # Spread-burst latency offsets & wave scheduler
+│   │   │   │   └── qr-auth.ts     # Headless SSO QR long-polling & SimpleCookieJar
 │   │   │   ├── ntp.ts             # Cloudflare trace time synchronization
 │   │   │   ├── scheduler.ts       # Precision countdown & zero-hour execution
 │   │   │   └── broadcaster.ts     # Real-time SSE event bus
-│   │   ├── api/                   # Elysia REST routes (auth, accounts, logs)
+│   │   ├── api/                   # Elysia REST routes (auth, accounts, qr, logs)
 │   │   ├── app.ts                 # Elysia app definition & dynamic CORS
 │   │   └── index.ts               # Daemon entrypoint
 │   ├── scripts/
 │   │   ├── capture-cookies.ts     # Interactive Chrome cookie capture tool
 │   │   └── run-e2e.ts             # Full-Stack Playwright automated test runner
-│   ├── tests/                     # Unit & Integration tests (bun:test)
+│   ├── tests/                     # Unit & Integration tests (bun:test, 26 tests)
 │   ├── openmi.service             # Systemd service unit template untuk VPS
 │   ├── .env.example               # Template environment backend
 │   └── package.json
 ├── frontend/                      # React SPA Dashboard (Vercel)
 │   ├── src/
-│   │   ├── components/            # Header, AccountCard, AccountModal, LogTerminal, LoginView
+│   │   ├── components/            # Header, AccountCard, AccountModal (QR & Manual), LogTerminal
 │   │   ├── hooks/                 # useAuth, useSSE
 │   │   ├── lib/                   # API client wrapper
 │   │   └── App.tsx                # Dashboard layout (Light Theme)
@@ -90,9 +103,10 @@ openmi/
 │   ├── .env.example               # Template environment frontend
 │   └── package.json
 ├── docs/                          # Spesifikasi & dokumentasi lengkap
-│   ├── api-spec.md                # Spesifikasi endpoint & payload Xiaomi
-│   ├── auth-guide.md              # Panduan ekstraksi cookie cUserId & serviceToken
-│   ├── automation-plan.md         # Rancangan arsitektur automasi & scheduler
+│   ├── api-spec.md                # Spesifikasi endpoint & payload Xiaomi + Internal API
+│   ├── auth-guide.md              # Panduan QR Login & ekstraksi cookie cUserId/serviceToken
+│   ├── automation-plan.md         # Rancangan arsitektur automasi, burst engine, & scheduler
+│   ├── miunlocktool-analysis.md   # Hasil analisis komparasi & adopsi fitur miunlocktool
 │   └── superpowers/               # Rancangan arsitektur & SDD execution plan
 └── vercel.json                    # Konfigurasi deployment Vercel
 ```
@@ -168,16 +182,16 @@ Buka `http://localhost:3000` di browser Anda. Masukkan `MASTER_PASSWORD` yang te
 ## Menjalankan Pengujian (Testing)
 
 ```bash
-# 1. Unit & Integration Test backend (100% native bun:test)
+# 1. Unit & Integration Test backend (100% native bun:test, 26 tests across 6 files)
 cd backend
 bun test
 
-# 2. Automated Full-Stack E2E Test (Playwright Chromium)
-# Menguji alur Login, CRUD Akun, Live Cookie Test, SSE Sync, dan Log Clear
+# 2. Automated Full-Stack E2E Test (Playwright Chromium, 16 test scenarios)
+# Menguji alur Login, CRUD Akun, Live Cookie Test, SSE Sync, QR Code Login, Burst Test, dan SQLite Clear
 bun run test:e2e
 
 # 3. Typecheck & Build frontend
 cd ../frontend
 bun run build
 ```
-Semua unit test backend berjalan instan (< 100 ms) dan suite E2E memvalidasi seluruh fungsionalitas UI secara komprehensif.
+Semua unit test backend berjalan instan (< 1 detik) dan suite E2E memvalidasi seluruh fungsionalitas UI secara komprehensif.

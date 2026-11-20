@@ -36,7 +36,23 @@ Pada form **Add Account** di dashboard OpenMi, terdapat dua parameter utama:
 
 ## 3. Cara Mendapatkan Cookie
 
-### Metode 1: Otomatis via Interactive Browser Capture (Rekomendasi Utama)
+### Metode 1: Scan QR Code Langsung di Dashboard (Paling Cepat & Praktis)
+
+OpenMi telah mengintegrasikan modul otentikasi QR SSO langsung di dashboard web tanpa perlu membuka peramban luar, mengunduh file, atau menyalin cookie secara manual:
+
+1. Buka dashboard OpenMi dan klik tombol **+ Add Account**.
+2. Modal akan langsung membuka tab **Scan QR Login** dan menampilkan kode QR resmi dari server Xiaomi SSO.
+3. Buka ponsel Xiaomi Anda:
+   * Masuk ke **Setelan (Settings)** -> **Akun Xiaomi (Xiaomi Account)** -> ketuk ikon pemindai QR di pojok kanan atas, ATAU
+   * Gunakan aplikasi **Pemindai / Kamera** bawaan ponsel Xiaomi.
+4. Pindai kode QR yang tampil di layar dashboard OpenMi.
+5. Pada layar HP, ketuk tombol **Setujui / Authorize**.
+6. Server backend OpenMi secara otomatis menerima konfirmasi scan, memproses rantai redirect otorisasi SSO, dan mengekstrak `cUserId` serta `serviceToken`.
+7. Form akun akan terisi secara otomatis dengan label bawaan. Pilih *Timing Mode* (misal: *Asia Burst*), lalu klik **Save Account**.
+
+---
+
+### Metode 2: Otomatis via Interactive Browser Capture (Script PC)
 
 OpenMi menyediakan skrip automasi interaktif berbasis Playwright yang memanfaatkan browser Google Chrome asli di PC Anda:
 
@@ -56,7 +72,7 @@ OpenMi menyediakan skrip automasi interaktif berbasis Playwright yang memanfaatk
 
 ---
 
-### Metode 2: Melalui Developer Tools Browser PC (Manual)
+### Metode 3: Melalui Developer Tools Browser PC (Manual)
 
 1. Buka browser (Chrome, Edge, atau Firefox) di PC.
 2. Login ke akun Xiaomi Anda di:  
@@ -71,11 +87,11 @@ OpenMi menyediakan skrip automasi interaktif berbasis Playwright yang memanfaatk
 6. Salin nilai cookie berikut:
    * **`cUserId`**: Salin nilai pada kolom Value.
    * **`serviceToken`** atau **`new_bbs_serviceToken`**: Salin string token panjang pada kolom Value.
-7. Masukkan kedua nilai tersebut ke form pendaftaran akun di dashboard OpenMi.
+7. Masukkan kedua nilai tersebut ke form pendaftaran akun di dashboard OpenMi (tab **Manual Input**).
 
 ---
 
-### Metode 3: Melalui Aplikasi Android (Reqable / Network Sniffer)
+### Metode 4: Melalui Aplikasi Android (Reqable / Network Sniffer)
 
 Jika Anda ingin mengekstrak cookie langsung dari aplikasi resmi **Xiaomi Community** di HP Android:
 
